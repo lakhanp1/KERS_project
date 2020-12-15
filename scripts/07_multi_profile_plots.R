@@ -12,7 +12,7 @@ rm(list = ls())
 ##################################################################################
 
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
-comparisonName <- "kdmB_del_sntB_del_20h_combined.2"
+comparisonName <- "kdmB_del_sntB_del_20h_combined"
 outPrefix <- here::here("analysis", "04_KS_del_binding", comparisonName, comparisonName)
 
 file_plotSamples <- here::here("analysis", "04_KS_del_binding", comparisonName, "samples.txt")
@@ -352,7 +352,6 @@ pdfWd <- 2 +
 
 title_all <- paste(comparisonName, ": all genes", collapse = "")
 
-# draw Heatmap and add the annotation name decoration
 # png(filename = paste(outPrefix_all, "_profiles.png", sep = ""), width=wd, height=3500, res = 250)
 pdf(file = paste(outPrefix_all, "_profiles.pdf", sep = ""), width = pdfWd, height = 13)
 
@@ -379,8 +378,12 @@ hasPeakDf <- filter_at(
   .vars_predicate = any_vars(. == "TRUE")
 )
 
-# plot genes which has TF peak in a specific TF sample
-# hasPeakDf <- filter_at(.tbl = expressionData, .vars = unname(tfCols$hasPeak[1]), .vars_predicate = any_vars(. == "TRUE"))
+## plot genes which has TF peak in a specific TF sample
+# hasPeakDf <- filter_at(
+#   .tbl = expressionData,
+#   .vars = unname(tfCols$hasPeak[1]),
+#   .vars_predicate = any_vars(. == "TRUE")
+# )
 
 
 multiProfiles_peak <- multi_profile_plots(
@@ -422,7 +425,7 @@ if(all(rownames(peaks_htlist@ht_list[[ tfData$profileName[1] ]]@matrix) == hasPe
 # wd <- 500 + (nrow(exptData) * 700) + (length(polII_ids) * 500 * showExpressionHeatmap)
 title_peak= paste(comparisonName, ": genes with binding signal (macs2 peak targets)", collapse = "")
 
-# draw Heatmap and add the annotation name decoration
+
 pdf(file = paste(outPrefix_peaks, "_profiles.pdf", sep = ""), width = pdfWd, height = 13)
 
 draw(peaks_htlist,
@@ -441,9 +444,7 @@ draw(peaks_htlist,
 dev.off()
 
 
-
-##draw Heatmap and add the annotation name decoration
-# peaks_htlist2 <- anGl_peaks$an
+## draw ungrouped profile Heatmap and add the annotation name decoration
 # 
 # peaks_htlist2 <- anGl_peaks$an
 # i <- 1
@@ -452,7 +453,6 @@ dev.off()
 # }
 # 
 # 
-# # draw Heatmap and add the annotation name decoration
 # pdf(file = paste(outPrefix_peaks, "_profiles_ungrouped.pdf", sep = ""), width = pdfWd, height = 13)
 # 
 # draw(peaks_htlist2,
@@ -559,7 +559,6 @@ if( all(rownames(pkExp_htlist@ht_list[[ polIIData$profileName[1] ]]@matrix) == p
 # wd <- 500 + (nrow(exptData) * 700) + (length(polII_ids) * 500 * showExpressionHeatmap)
 title_pkExp <- paste(comparisonName, ": macs2 peak target genes and top 10% polII signal genes", collapse = "")
 
-# draw Heatmap and add the annotation name decoration
 # png(filename = paste(outPrefix_pkExp, "_profiles.png", sep = ""), width=wd, height=3500, res = 270)
 pdf(file = paste(outPrefix_pkExp, "_profiles.pdf", sep = ""), width = pdfWd, height = 13)
 
@@ -623,7 +622,6 @@ if( all(rownames(exp_htlist@ht_list[[ polIIData$profileName[1] ]]@matrix) == isE
 # wd <- 500 + (nrow(exptData) * 700) + (length(polII_ids) * 500 * showExpressionHeatmap)
 title_exp <- paste(comparisonName, ": top 10% polII signal genes", collapse = "")
 
-# draw Heatmap and add the annotation name decoration
 # png(filename = paste(outPrefix_expressed, "_profiles.png", sep = ""), width=wd, height=3500, res = 270)
 pdf(file = paste(outPrefix_expressed, "_profiles.pdf", sep = ""), width = pdfWd, height = 13)
 
@@ -647,7 +645,6 @@ dev.off()
 
 smDf <- expressionData[which(expressionData$is_SM_gene), ]
 
-
 multiProfiles_sm <- multi_profile_plots(
   exptInfo = exptData,
   expressionData = smDf,
@@ -662,7 +659,6 @@ multiProfiles_sm <- multi_profile_plots(
   ylimFraction = ylimList
 )
 
-
 ## gene length annotation
 anGl_sm <- gene_length_heatmap_annotation(
   bedFile = file_genes, genes = smDf$geneId,
@@ -675,7 +671,6 @@ sm_htlist <- anGl_sm$an + multiProfiles_sm$heatmapList
 wd <- 500 + (nrow(exptData) * 700) + (length(polII_ids) * 500 * showExpressionHeatmap)
 title_peak= paste(comparisonName, ": SM genes", collapse = "")
 
-# draw Heatmap and add the annotation name decoration
 # png(filename = paste(outPrefix_sm, "_profiles.png", sep = ""), width=wd, height=3500, res = 270)
 pdf(file = paste(outPrefix_sm, "_profiles.pdf", sep = ""), width = pdfWd, height = 13)
 
@@ -695,22 +690,6 @@ dev.off()
 
 
 ##################################################################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

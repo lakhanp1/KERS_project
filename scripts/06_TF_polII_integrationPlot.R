@@ -41,8 +41,7 @@ orgDb <- org.Anidulans.FGSCA4.eg.db
 
 ##################################################################################
 
-# outPath <- paste(TF_dataPath, "/", name, sep = "")
-outPath <- here::here("temp")
+outPath <- paste(TF_dataPath, "/", name, sep = "")
 outPrefix_all <- paste(outPath, "/", name, "_allGenes", sep = "")
 outPrefix_expressed <- paste(outPath, "/", name, "_expressedGenes", sep = "")
 outPrefix_sm <- paste(outPath, "/", name, "_SM_genes", sep = "")
