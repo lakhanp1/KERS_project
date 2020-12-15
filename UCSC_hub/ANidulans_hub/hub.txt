@@ -1,0 +1,6 @@
+hub ANidulans_hub
+shortLabel ANidulans_KERS
+longLabel This UCSC trackhub shows ChIPseq data of tetrameric chromatin modification complex KdmB-EcoA-RpdA-SntB in the fungus Aspergillus nidulans.
+genomesFile genomes.txt
+email lakhanp@um.edu.mo
+descriptionUrl aboutHub.html

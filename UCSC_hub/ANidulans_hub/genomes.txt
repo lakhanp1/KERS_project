@@ -1,0 +1,10 @@
+genome ANidulans_hub
+trackDb ANidulans_hub/trackDb.txt
+groups ANidulans_hub/groups.txt
+description (KdmB-EcoA-RpdA-SntB chromatin modification complex in A. nidulans)
+twoBitPath ANidulans_hub/ANidulans_hub.2bit
+organism A. nidulans FGSC_A4 FungiDb
+defaultPos ChrVIII_A_nidulans_FGSC_A4:4201550-4212926
+orderKey 4800
+scientificName A. nidulans
+htmlPath hmi/description.html

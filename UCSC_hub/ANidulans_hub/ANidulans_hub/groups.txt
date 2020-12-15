@@ -1,0 +1,25 @@
+name genePreds
+label Gene Predictions
+priority 2
+defaultIsClosed 0
+
+name reps
+label Repeats
+priority 2
+defaultIsClosed 0
+
+name hints
+label Hints
+priority 2
+defaultIsClosed 0
+
+name 20h
+label KERS 20h ChIPseq
+priority 3
+defaultIsClosed 0
+
+name 48h
+label KERS 48h ChIPseq
+priority 4
+defaultIsClosed 0
+

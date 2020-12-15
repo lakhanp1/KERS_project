@@ -1,0 +1,17 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.log
+*.pptx
+*.xlsx
+*.docx
+*.xml
+/Rplots.pdf
+/logs
+sample_info.txt
+/data/**/*.bw
+/data/
+!/data/reference_data/
+/analysis
+/reports
