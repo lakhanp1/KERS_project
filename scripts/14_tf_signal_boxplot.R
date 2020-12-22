@@ -1,10 +1,10 @@
-library(chipmine)
-library(org.Anidulans.FGSCA4.eg.db)
-library(scales)
-library(ggplot2)
+suppressPackageStartupMessages(library(chipmine))
+suppressPackageStartupMessages(library(org.Anidulans.FGSCA4.eg.db))
+suppressPackageStartupMessages(library(scales))
+suppressPackageStartupMessages(library(ggplot2))
 
-
-## This script compares the TF signal across polII fold change groups for TFs of interest
+## This script:
+## variation of 48h vs 20h binding intensity for KERS ChIPseq w.r.t. polII 48h/20h fold change
 
 
 rm(list = ls())
@@ -13,7 +13,8 @@ rm(list = ls())
 ##################################################################################
 ## main configuration
 comparisonName <- "tf_signal_polII_correlation"
-outPrefix <- here::here("kdmB_analysis", "combined_analysis", comparisonName)
+outDir <- here::here("analysis", "08_combined_analysis", comparisonName)
+outPrefix <- paste(outDir, "/", comparisonName, sep = "")
 
 tfDiffPairs <- list(
   p1 = list(
@@ -36,10 +37,8 @@ tfDiffPairs <- list(
 
 mainTfPair <- "p1"
 
-
 tf1 <- tfDiffPairs[[mainTfPair]]$samples[1]
 tf2 <- tfDiffPairs[[mainTfPair]]$samples[2]
-
 
 ## polII signal fold change pairs
 polIIDiffPairs <- list(
@@ -75,55 +74,66 @@ matrixType <- "normalizedmatrix_5kb"
 matrixDim = c(500, 200, 100, 10)
 
 ## genes to read
-file_exptInfo <- here::here("data", "referenceData/sampleInfo.txt")
-file_genes <- here::here("data", "referenceData/AN_genesForPolII.bed")
-file_topGoMap <- "E:/Chris_UM/Database/A_Nidulans/ANidulans_OrgDb/geneid2go.ANidulans.topGO.map"
-file_geneInfo <- "E:/Chris_UM/Database/A_Nidulans/A_nidulans_FGSC_A4_geneClasses.txt"
+file_exptInfo <- here::here("data", "reference_data", "sampleInfo.txt")
+file_genes <- here::here("data", "reference_data", "AN_genesForPolII.bed")
+file_topGoMap <- "E:/Chris_UM/Database/A_Nidulans/annotation_resources/geneid2go.ANidulans.topGO.map"
 
-TF_dataPath <- here::here("data", "TF_data")
-polII_dataPath <- here::here("data", "polII_data")
-hist_dataPath <- here::here("data", "histone_data")
-
+TF_dataPath <- here::here("..", "data", "A_nidulans", "TF_data")
+polII_dataPath <- here::here("..", "data", "A_nidulans", "polII_data")
+hist_dataPath <- here::here("..", "data", "A_nidulans", "histone_data")
+other_dataPath <- here::here("..", "data", "A_nidulans", "other_data")
 
 orgDb <- org.Anidulans.FGSCA4.eg.db
 
 showExpressionHeatmap <- FALSE
 
-
-
 ##################################################################################
 
 ## genes to read
-geneSet <- data.table::fread(file = file_genes, header = F,
-                             col.names = c("chr", "start", "end", "gene", "score", "strand")) %>% 
-  dplyr::mutate(length = end - start)
+geneSet <- suppressMessages(
+  readr::read_tsv(file = file_genes, col_names = c("chr", "start", "end", "geneId", "score", "strand"))
+) %>% 
+  dplyr::select(geneId)
 
 geneDesc <- suppressMessages(
-  AnnotationDbi::select(x = orgDb, keys = geneSet$gene, columns = "DESCRIPTION", keytype = "GID")
+  AnnotationDbi::select(x = orgDb, keys = geneSet$geneId,
+                        columns = c("DESCRIPTION"), keytype = "GID")
 )
 
-geneSet <- dplyr::left_join(x = geneSet, y = geneDesc, by = c("gene" = "GID"))
+smInfo <- suppressMessages(
+  AnnotationDbi::select(x = orgDb, keys = keys(orgDb, keytype = "SM_CLUSTER"),
+                        columns = c("GID", "SM_ID"), keytype = "SM_CLUSTER")) %>% 
+  dplyr::group_by(GID) %>% 
+  dplyr::mutate(SM_CLUSTER = paste(SM_CLUSTER, collapse = ";"),
+                SM_ID = paste(SM_ID, collapse = ";")) %>% 
+  dplyr::slice(1L) %>% 
+  dplyr::ungroup()
 
-## gene information annotations: cluster and TF and polII expression values
-geneInfo <- add_gene_info(file = file_geneInfo, clusterDf = geneSet)
+geneInfo <- dplyr::left_join(x = geneSet, y = geneDesc, by = c("geneId" = "GID")) %>% 
+  dplyr::left_join(y = smInfo, by = c("geneId" = "GID"))
 
-head(geneInfo)
+glimpse(geneInfo)
 
 ##################################################################################
 
 ## read the experiment sample details and select only those which are to be plotted
 
-tfData <- get_sample_information(exptInfoFile = file_exptInfo,
-                                 samples = unique(map(tfDiffPairs, "samples") %>% unlist() %>% unname()),
-                                 dataPath = TF_dataPath,
-                                 matrixSource = matrixType)
+tfData <- get_sample_information(
+  exptInfoFile = file_exptInfo,
+  samples = unique(map(tfDiffPairs, "samples") %>% unlist() %>% unname()),
+  dataPath = TF_dataPath, profileMatrixSuffix = matrixType
+)
 
-polIIData <- get_sample_information(exptInfoFile = file_exptInfo,
-                                    samples = unique(map(polIIDiffPairs, "samples") %>% unlist() %>% unname()),
-                                    dataPath = polII_dataPath,
-                                    matrixSource = matrixType)
+polIIData <- get_sample_information(
+  exptInfoFile = file_exptInfo,
+  samples = unique(map(polIIDiffPairs, "samples") %>% unlist() %>% unname()),
+  dataPath = polII_dataPath, profileMatrixSuffix = matrixType
+)
 
 exptData <- dplyr::bind_rows(tfData, polIIData)
+
+exptDataList <- purrr::transpose(exptData)  %>% 
+  purrr::set_names(nm = purrr::map(., "sampleId"))
 
 polII_ids <- exptData$sampleId[which(exptData$IP_tag == "polII")]
 tfIds <- exptData$sampleId[which(exptData$IP_tag %in% c("HA", "MYC", "TAP") & exptData$TF != "untagged")]
@@ -135,9 +145,13 @@ polIICols <- list(
 )
 
 
-tfCols <- sapply(c("hasPeak", "pval", "peakType", "tesPeakType", "peakCoverage", "peakDist", "summitDist", "upstreamExpr", "peakExpr", "relativeDist"),
-                 FUN = function(x){ structure(paste(x, ".", tfIds, sep = ""), names = tfIds) },
-                 simplify = F, USE.NAMES = T)
+tfCols <- sapply(
+  c("hasPeak", "peakId", "peakEnrichment", "peakPval", "peakQval", "peakSummit", "peakDist", "summitDist",
+    "peakType", "bidirectional", "featureCovFrac", "relativeSummitPos", "peakRegion", "peakPosition",
+    "peakCoverage", "pvalFiltered", "summitSeq"),
+  FUN = function(x){ structure(paste(x, ".", tfIds, sep = ""), names = tfIds) },
+  simplify = F, USE.NAMES = T)
+
 
 
 expressionData <- get_polII_expressions(exptInfo = exptData,
@@ -145,11 +159,13 @@ expressionData <- get_polII_expressions(exptInfo = exptData,
 
 ## add fold change columns
 for (i in names(polIIDiffPairs)) {
-  expressionData <- get_fold_change(df = expressionData,
-                                    nmt = polIIDiffPairs[[i]]$samples[2],
-                                    dmt = polIIDiffPairs[[i]]$samples[1],
-                                    newCol = polIIDiffPairs[[i]]$name,
-                                    isExpressedCols = polIICols$is_expressed)
+  expressionData <- get_fold_change(
+    df = expressionData,
+    nmt = polIIDiffPairs[[i]]$samples[2],
+    dmt = polIIDiffPairs[[i]]$samples[1],
+    newCol = polIIDiffPairs[[i]]$name,
+    isExpressedCols = polIICols$is_expressed
+  )
 }
 
 
@@ -158,78 +174,97 @@ expressionData <- get_TF_binding_data(exptInfo = tfData,
 
 
 expressionData %>% 
-  dplyr::select(gene, starts_with("hasPeak")) %>% 
+  dplyr::select(geneId, starts_with("hasPeak")) %>% 
   dplyr::group_by_at(.vars = vars(starts_with("hasPeak"))) %>% 
   dplyr::summarise(n = n())
 
 ##################################################################################
 ## peak data
-peakExpDf <- dplyr::filter_at(.tbl = expressionData,
-                              .vars = unname(tfCols$hasPeak),
-                              .vars_predicate = any_vars(. == "TRUE")) %>% 
-  dplyr::filter_at(.vars = unname(polIICols$is_expressed[c(polII1, polII2)]),
-                   .vars_predicate = any_vars(. == TRUE)) %>% 
-  dplyr::select(gene, starts_with("hasPeak"), starts_with("peakCoverage"),
-                !!! map(polIIDiffPairs, function(x) as.name(x[["name"]])) %>% unname())
+peakExpDf <- dplyr::filter_at(
+  .tbl = expressionData, .vars = unname(tfCols$hasPeak),
+  .vars_predicate = any_vars(. == "TRUE")
+) %>% 
+  dplyr::filter_at(
+    .vars = unname(polIICols$is_expressed[c(polII1, polII2)]),
+    .vars_predicate = any_vars(. == TRUE)
+  ) %>% 
+  dplyr::select(
+    geneId, starts_with("hasPeak"), starts_with("peakCoverage"),
+    !!! map(polIIDiffPairs, function(x) as.name(x[["name"]])) %>% unname()
+  )
 
 
 ## group genes into polII fold change bins
-peakExpDf <- dplyr::mutate(peakExpDf,
-                           group = case_when(
-                             !! as.name(polIIDiffPairs$p1$name) >= 2 ~ "G1: LFC >= 2",
-                             !! as.name(polIIDiffPairs$p1$name) >= 1 ~ "G2: 1 <= LFC < 2",
-                             !! as.name(polIIDiffPairs$p1$name) >= 0.5 ~ "G3: 0.5 <= LFC < 1",
-                             !! as.name(polIIDiffPairs$p1$name) >= 0 ~ "G4: 0 <= LFC < 0.5",
-                             !! as.name(polIIDiffPairs$p1$name) <= -2 ~ "G8: -2 >= LFC",
-                             !! as.name(polIIDiffPairs$p1$name) <= -1 ~ "G7: -2 < LFC <= -1",
-                             !! as.name(polIIDiffPairs$p1$name) <= -0.5 ~ "G6: -1 < LFC <= -0.5",
-                             !! as.name(polIIDiffPairs$p1$name) < 0 ~ "G5: -0.5 < LFC < 0",
-                             TRUE ~ "0"
-                           ))
-
-## convert dataframe to long format
-longDf <- data.table::melt(
-  data = as.data.table(peakExpDf),
-  measure.vars = list(tfCols$hasPeak, tfCols$peakCoverage),
-  variable.name = "sample",
-  value.name = c("hasPeak", "peakCoverage")
+peakExpDf <- dplyr::mutate(
+  peakExpDf,
+  group = case_when(
+    !! as.name(polIIDiffPairs$p1$name) >= 2 ~ "G1: LFC >= 2",
+    !! as.name(polIIDiffPairs$p1$name) >= 1 ~ "G2: 1 <= LFC < 2",
+    !! as.name(polIIDiffPairs$p1$name) >= 0.5 ~ "G3: 0.5 <= LFC < 1",
+    !! as.name(polIIDiffPairs$p1$name) >= 0 ~ "G4: 0 <= LFC < 0.5",
+    !! as.name(polIIDiffPairs$p1$name) <= -2 ~ "G8: -2 >= LFC",
+    !! as.name(polIIDiffPairs$p1$name) <= -1 ~ "G7: -2 < LFC <= -1",
+    !! as.name(polIIDiffPairs$p1$name) <= -0.5 ~ "G6: -1 < LFC <= -0.5",
+    !! as.name(polIIDiffPairs$p1$name) < 0 ~ "G5: -0.5 < LFC < 0",
+    TRUE ~ "0"
+  )
 )
 
-longDf$sample <- forcats::fct_recode(
-  .f = longDf$sample,
-  structure(.Data = levels(longDf$sample), names = names(tfCols$hasPeak))
+# ## convert dataframe to long format
+# longDf <- data.table::melt(
+#   data = as.data.table(peakExpDf),
+#   measure.vars = list(tfCols$hasPeak, tfCols$peakCoverage),
+#   variable.name = "sample",
+#   value.name = c("hasPeak", "peakCoverage")
+# )
+# 
+# 
+# longDf$sample <- forcats::fct_recode(
+#   .f = longDf$sample,
+#   structure(.Data = levels(longDf$sample), names = names(tfCols$hasPeak))
+# )
+# 
+# longDf$sample <- as.character(longDf$sample)
+
+## box plots
+longDf <- tidyr::pivot_longer(
+  data = peakExpDf,
+  cols = c(starts_with("hasPeak."), starts_with("peakCoverage.")),
+  names_to = c(".value", "sampleId"),
+  names_sep = "\\."
 )
 
-longDf$sample <- as.character(longDf$sample)
+longDf$sampleId <- forcats::fct_relevel(.f = longDf$sampleId, names(tfCols$hasPeak))
+
 
 ## add TF, time info columns
-longDf <- dplyr::left_join(longDf, dplyr::select(tfData, sampleId, TF, timepoint), by = c("sample" = "sampleId")) %>% 
+longDf <- dplyr::left_join(
+  x = longDf, y = dplyr::select(tfData, sampleId, TF, timepoint), by = "sampleId"
+) %>% 
+  dplyr::arrange(geneId, TF) %>% 
   as.data.table()
 
-## make timepoint wise pair columns for hasPeak and peakCoverage
-pairDf <- dcast.data.table(
-  data = as.data.table(longDf),
-  formula = gene + TF + untagged_48h_vs_untagged_20h_polII + group ~ timepoint,
-  value.var = c("hasPeak", "peakCoverage")) %>% 
-  as.tibble() %>% 
-  dplyr::filter_at(.vars = vars(starts_with("hasPeak_")), .vars_predicate = all_vars(. == TRUE))
+## make timepoint wise pair columns for hasPeak and peakCoverage at 20h and 48h
+pairDf <- tidyr::pivot_wider(
+  data = longDf,
+  id_cols = c(geneId, TF, untagged_48h_vs_untagged_20h_polII, group),
+  names_from = c(timepoint),
+  values_from = c(hasPeak, peakCoverage),
+  names_sep = "."
+) %>% 
+  dplyr::filter_at(.vars = vars(starts_with("hasPeak.")), .vars_predicate = all_vars(. == TRUE))
 
-
-pltDf <- melt.data.table(
-  data = as.data.table(pairDf),
-  measure.vars = list(c("hasPeak_20h", "hasPeak_48h"), c("peakCoverage_20h", "peakCoverage_48h")),
-  variable.name = "timepoint",
-  value.name = c("hasPeak", "peakCoverage"))
-
-pltDf$timepoint <- forcats::fct_recode(
-  .f = pltDf$timepoint,
-  structure(levels(pltDf$timepoint), names = c("20h", "48h"))
-)
-
-
-pltDf$TF <- factor(pltDf$TF, levels = c("kdmB", "sntB", "ecoA", "rpdA"))
-pltDf$group <- factor(pltDf$group, levels = sort(unique(pltDf$group)))
-# pltDf$timepoint <- as.character(pltDf$timepoint)
+pltDf <- tidyr::pivot_longer(
+  data = pairDf,
+  cols = c(starts_with("hasPeak."), starts_with("peakCoverage.")),
+  names_to = c(".value", "timepoint"),
+  names_sep = "\\."
+) %>% 
+  dplyr::mutate(
+    timepoint = forcats::fct_relevel(.f = timepoint, c("20h", "48h")),
+    TF = forcats::fct_relevel(.f = TF, c("kdmB", "sntB", "ecoA", "rpdA")),
+    group = forcats::fct_relevel(group, sort(unique(pltDf$group)))
+  )
 
 
 pt <- ggplot(data = pltDf, mapping = aes(x = group, y = peakCoverage)) +
@@ -253,7 +288,7 @@ pt <- ggplot(data = pltDf, mapping = aes(x = group, y = peakCoverage)) +
   )
 
 
-pdf(file = paste(outPrefix, "_box.pdf", sep = ""), width = 20, height = 10)
+pdf(file = paste(outPrefix, ".box.pdf", sep = ""), width = 20, height = 10)
 pt
 dev.off()
 

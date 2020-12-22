@@ -1,7 +1,7 @@
-library(chipmine)
-library(org.Anidulans.FGSCA4.eg.db)
-library(here)
-library(summarytools)
+suppressPackageStartupMessages(library(chipmine))
+suppressPackageStartupMessages(library(here))
+suppressPackageStartupMessages(library(summarytools))
+suppressPackageStartupMessages(library(org.Anidulans.FGSCA4.eg.db))
 
 ## generate profile plots for kdmB complex members
 ## group the genes into different categories based on kdmB complex member binding status
@@ -10,16 +10,16 @@ library(summarytools)
 
 rm(list = ls())
 
-source(file = "E:/Chris_UM/GitHub/omics_util/04_GO_enrichment/topGO_functions.R")
+source(file = "E:/Chris_UM/GitHub/omics_util/04_GO_enrichment/s01_topGO_functions.R")
 
+##################################################################################
 
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
 analysisName <- "KERS_complex_20h"
-workDir <- here::here("kdmB_analysis", "03_KERS_complex", analysisName)
-outPrefix <- paste(workDir, "/", analysisName, sep = "")
+outDir <- here::here("analysis", "03_KERS_complex", analysisName)
+outPrefix <- paste(outDir, "/", analysisName, sep = "")
 
-file_plotSamples <- paste(workDir, "/", "samples.txt", sep = "")
-orgDb <- org.Anidulans.FGSCA4.eg.db
+file_plotSamples <- paste(outDir, "/", "samples.txt", sep = "")
 
 matrixType <- "normalizedMatrix_5kb"
 up <- 5000
@@ -31,20 +31,22 @@ matrixDim = c(c(up, body, down)/binSize, binSize)
 showExpressionHeatmap = TRUE
 
 ## genes to read
-file_exptInfo <- here::here("data", "referenceData/sampleInfo.txt")
-file_genes <- here::here("data", "referenceData/AN_genesForPolII.bed")
+file_exptInfo <- here::here("data", "reference_data", "sampleInfo.txt")
+file_genes <- here::here("data", "reference_data", "AN_genesForPolII.bed")
 file_topGoMap <- "E:/Chris_UM/Database/A_Nidulans/annotation_resources/geneid2go.ANidulans.topGO.map"
-file_geneInfo <- "E:/Chris_UM/Database/A_Nidulans/A_nidulans_FGSC_A4_geneClasses.txt"
 
-TF_dataPath <- here::here("data", "TF_data")
-polII_dataPath <- here::here("data", "polII_data")
-hist_dataPath <- here::here("data", "histone_data")
+TF_dataPath <- here::here("..", "data", "A_nidulans", "TF_data")
+polII_dataPath <- here::here("..", "data", "A_nidulans", "polII_data")
+hist_dataPath <- here::here("..", "data", "A_nidulans", "histone_data")
+other_dataPath <- here::here("..", "data", "A_nidulans", "other_data")
+
+orgDb <- org.Anidulans.FGSCA4.eg.db
 
 anLables <- list()
 
 ##################################################################################
 
-sampleList <- suppressMessages(readr::read_tsv(file = file_plotSamples, col_names = T, comment = "#"))
+sampleList <- suppressMessages(readr::read_tsv(file = file_plotSamples, comment = "#"))
 
 ## genes to read
 geneSet <- suppressMessages(
@@ -54,7 +56,8 @@ geneSet <- suppressMessages(
 
 geneDesc <- suppressMessages(
   AnnotationDbi::select(x = orgDb, keys = geneSet$geneId,
-                        columns = c("DESCRIPTION"), keytype = "GID"))
+                        columns = c("DESCRIPTION"), keytype = "GID")
+)
 
 smInfo <- suppressMessages(
   AnnotationDbi::select(x = orgDb, keys = keys(orgDb, keytype = "SM_CLUSTER"),
@@ -68,7 +71,7 @@ smInfo <- suppressMessages(
 geneInfo <- dplyr::left_join(x = geneSet, y = geneDesc, by = c("geneId" = "GID")) %>% 
   dplyr::left_join(y = smInfo, by = c("geneId" = "GID"))
 
-head(geneInfo)
+glimpse(geneInfo)
 
 
 ##################################################################################
@@ -146,7 +149,7 @@ dplyr::group_by_at(hasPeakDf, .vars = vars(starts_with("hasPeak."))) %>%
   dplyr::summarise(n = n_distinct(geneId))
 
 
-readr::write_tsv(x = hasPeakDf, path = paste(outPrefix, ".peaks_data.tab", sep = ""))
+readr::write_tsv(x = hasPeakDf, file = paste(outPrefix, ".peaks_data.tab", sep = ""))
 
 ## group label data mean profile facet plot
 groupLabelDf <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
@@ -159,7 +162,7 @@ groupLabels <- structure(groupLabelDf$groupLabels, names = groupLabelDf$group)
 ## binding stats
 bindingMat = combinatorial_binding_matrix(sampleInfo = tfData, summitRegion = 100)
 
-readr::write_tsv(x = bindingMat, path = paste(outPrefix, ".binding_matrix.tab", sep = ""))
+readr::write_tsv(x = bindingMat, file = paste(outPrefix, ".binding_matrix.tab", sep = ""))
 
 ##################################################################################
 ## topGO enrichment
@@ -200,8 +203,10 @@ readr::write_tsv(x = keggEnr, path = paste(outPrefix, ".peakGroups.KEGG_enrichme
 ##################################################################################
 
 ## profile matrix of the genes which show binding
-matList <- import_profiles(exptInfo = exptData, geneList = unique(geneInfo$geneId), source = matrixType,
-                           up = matrixDim[1], target = matrixDim[2], down = matrixDim[3])
+matList <- import_profiles(
+  exptInfo = exptData, geneList = unique(geneInfo$geneId), source = matrixType,
+  up = matrixDim[1], target = matrixDim[2], down = matrixDim[3]
+)
 
 ## get average signal over all factors to select color
 tfMeanProfile <- getSignalsFromList(lt = matList[tfIds])
@@ -212,8 +217,10 @@ tfColorList <- sapply(
   X = c(tfIds, inputIds),
   FUN = function(x){
     return(
-      colorRamp2(breaks = quantile(tfMeanProfile, c(0.50, 0.995), na.rm = T),
-                 colors = unlist(strsplit(x = exptDataList[[x]]$color, split = ",")))
+      colorRamp2(
+        breaks = quantile(tfMeanProfile, c(0.50, 0.995), na.rm = T),
+        colors = unlist(strsplit(x = exptDataList[[x]]$color, split = ","))
+      )
     )
   }
 )
@@ -322,15 +329,16 @@ colNameAnn <- HeatmapAnnotation(
   annotation_height = unit.c(max_text_width(unname(tfCols$hasPeak)))
 )
 
-grp_ht <- Heatmap(as.matrix(htMat),
-                  col = c("TRUE" = "black", "FALSE" = "white"),
-                  heatmap_legend_param = list(title = "Peak detected"),
-                  # column_names_side = "top",
-                  show_column_names = FALSE,
-                  top_annotation = colNameAnn,
-                  cluster_columns = FALSE, cluster_rows = FALSE,
-                  width = unit(3, "cm"),
-                  show_row_names = FALSE
+grp_ht <- Heatmap(
+  as.matrix(htMat),
+  col = c("TRUE" = "black", "FALSE" = "white"),
+  heatmap_legend_param = list(title = "Peak detected"),
+  # column_names_side = "top",
+  show_column_names = FALSE,
+  top_annotation = colNameAnn,
+  cluster_columns = FALSE, cluster_rows = FALSE,
+  width = unit(3, "cm"),
+  show_row_names = FALSE
 )
 
 ## gene length annotation
@@ -377,17 +385,21 @@ lineShape = structure(.Data = c(1, 1, 1, 1, 6),
                       names = exptData$sampleId[exptData$sampleId %in% c(tfIds, inputIds)])
 
 
-draw_avg_profile_plot(exptInfo = exptData[exptData$sampleId %in% c(tfIds, inputIds), ],
-                      profileMats = matList,
-                      genes = testDf$geneId,
-                      lineColors = lineColors,
-                      lineShape = lineShape)
+draw_avg_profile_plot(
+  exptInfo = exptData[exptData$sampleId %in% c(tfIds, inputIds), ],
+  profileMats = matList,
+  genes = testDf$geneId,
+  lineColors = lineColors,
+  lineShape = lineShape
+)
 
 
-ap <- geneset_average_profile(exptInfo = exptData[exptData$sampleId %in% c(tfIds, inputIds), ],
-                              profileMats = matList,
-                              genes = testDf$geneId,
-                              cluster = "group_1")
+ap <- geneset_average_profile(
+  exptInfo = exptData[exptData$sampleId %in% c(tfIds, inputIds), ],
+  profileMats = matList,
+  genes = testDf$geneId,
+  cluster = "group_1"
+)
 
 
 ## average profile data for each group
