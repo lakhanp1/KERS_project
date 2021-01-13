@@ -139,7 +139,7 @@ smGenes <- AnnotationDbi::select(
 geneInfo <- dplyr::left_join(x = kmClust, y = geneDesc, by = c("geneId" = "GID")) %>% 
   dplyr::left_join(y = smGenes, by = c("geneId" = "GID"))
 
-head(geneInfo)
+glimpse(geneInfo)
 
 expressionData <- get_TF_binding_data(exptInfo = tfData,
                                       genesDf = geneInfo)

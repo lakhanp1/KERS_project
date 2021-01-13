@@ -1,10 +1,9 @@
-library(chipmine)
-require(XLConnect)
-options(java.parameters = "- Xmx4g")
-xlcFreeMemory()
-library(here)
-library(foreach)
-library(doParallel)
+suppressPackageStartupMessages(library(chipmine))
+suppressPackageStartupMessages(library(here))
+suppressPackageStartupMessages(library(openxlsx))
+suppressPackageStartupMessages(library(org.Anidulans.FGSCA4.eg.db))
+suppressPackageStartupMessages(library(foreach))
+suppressPackageStartupMessages(library(doParallel))
 
 
 rm(list = ls())

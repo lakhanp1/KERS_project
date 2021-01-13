@@ -1,9 +1,7 @@
-library(chipmine)
-library(org.Anidulans.FGSCA4.eg.db)
-library(here)
-require(XLConnect)
-options(java.parameters = "- Xmx4g")
-library(foreach)
+suppressPackageStartupMessages(library(chipmine))
+suppressPackageStartupMessages(library(org.Anidulans.FGSCA4.eg.db))
+suppressPackageStartupMessages(library(here))
+suppressPackageStartupMessages(library(foreach))
 
 
 ## 1) perform the GO enrichment using topGO for the genes which show binding signal
@@ -11,8 +9,7 @@ library(foreach)
 
 rm(list = ls())
 
-source(file = "E:/Chris_UM/Codes/GO_enrichment/topGO_functions.R")
-
+source(file = "https://raw.githubusercontent.com/lakhanp1/omics_utils/master/04_GO_enrichment/s01_enrichment_functions.R")
 
 # path <- "E:/Chris_UM/Analysis/21_CL2017_ChIPmix_ULAS_MIX/ULAS_AN/data/"
 # setwd(path)

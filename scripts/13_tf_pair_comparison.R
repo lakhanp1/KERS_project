@@ -12,7 +12,7 @@ suppressPackageStartupMessages(library(summarytools))
 
 rm(list = ls())
 
-source(file = "E:/Chris_UM/GitHub/omics_util/04_GO_enrichment/s01_topGO_functions.R")
+source(file = "https://raw.githubusercontent.com/lakhanp1/omics_utils/master/04_GO_enrichment/s01_enrichment_functions.R")
 
 ##################################################################################
 ## main configuration
@@ -20,6 +20,13 @@ comparisonName <- "kdmB_48h_vs_20h.2"
 outDir <- here::here("analysis", "05_KERS_48h_vs_20h", comparisonName)
 outPrefix <- paste(outDir, "/", comparisonName, sep = "")
 
+file_polIIRatioConf <- here::here("data", "reference_data", "polII_ratio.config.tab")
+
+mainPolIIPair <- "polII_untagged.48h_vs_20h"
+polIIPairs <- c(
+  mainPolIIPair, "polII_kdmB_del.48h_vs_20h", "polII_20h.kdmB_del_vs_untagged",
+  "polII_48h.kdmB_del_vs_untagged"
+)
 
 tfDiffPairs <- list(
   p1 = list(
@@ -42,46 +49,13 @@ tfDiffPairs <- list(
 
 mainTfPair <- "p1"
 
-tf1 <- tfDiffPairs[[mainTfPair]]$samples[1]
-tf2 <- tfDiffPairs[[mainTfPair]]$samples[2]
-
 otherHist <- c("An_H3_20h_HIST_1", "An_H3_48h_HIST_1")
-
-
-## polII signal fold change pairs
-polIIDiffPairs <- list(
-  p1 = list(
-    name = "untagged_48h_vs_untagged_20h_polII",
-    title = "polII log2(untagged_48h \n vs untagged_20h)",
-    samples = c("An_untagged_20h_polII_1", "An_untagged_48h_polII_1")
-  ),
-  p2 = list(
-    name = "kdmB_del_48h_vs_kdmB_del_20h_polII",
-    title = "polII log2(kdmB_del_48h \n vs kdmB_del_20h)",
-    samples =  c("An_kdmB_del_20h_polII_1", "An_kdmB_del_48h_polII_1")
-  ),
-  p3 = list(
-    name = "kdmB_del_20h_vs_untagged_20h_polII",
-    title = "polII log2(kdmB_del_20h \n vs untagged_20h_polII)",
-    samples = c("An_untagged_20h_polII_1", "An_kdmB_del_20h_polII_1")
-  ),
-  p4 = list(
-    name = "kdmB_del_48h_vs_untagged_48h_polII",
-    title = "polII log2(kdmB_del_48h \n vs untagged_48h_polII)",
-    samples = c("An_untagged_48h_polII_1", "An_kdmB_del_48h_polII_1")
-  )
-)
-
-mainPolIIPair <- "p1"
-
-polII1 <- polIIDiffPairs[[mainPolIIPair]]$samples[1]
-polII2 <- polIIDiffPairs[[mainPolIIPair]]$samples[2]
 
 # "deeptools", "miao", "normalizedmatrix", "normalizedmatrix_5kb"
 matrixType <- "normalizedmatrix_5kb"
 matrixDim = c(500, 200, 100, 10)
 
-clusterStorePath <- paste(outPrefix, "_profile.kmeans.clusters.txt", sep = "")
+clusterStorePath <- paste(outPrefix, ".profile_kmeans_clusters.txt", sep = "")
 
 ## genes to read
 file_exptInfo <- here::here("data", "reference_data", "sampleInfo.txt")
@@ -97,9 +71,9 @@ orgDb <- org.Anidulans.FGSCA4.eg.db
 
 showExpressionHeatmap <- FALSE
 
-outPrefix_tfPolII <- paste(outPrefix, "_tfPolII", sep = "")
-outPrefix_tfSpecific <- paste(outPrefix, "_specific_binding", sep = "")
-outPrefix_peakExp <- paste(outPrefix, "_pkExpGenes", sep = "")
+outPrefix_tfPolII <- paste(outPrefix, ".tfPolII", sep = "")
+outPrefix_tfSpecific <- paste(outPrefix, ".specific_binding", sep = "")
+outPrefix_peakExp <- paste(outPrefix, ".pkExpGenes", sep = "")
 
 anLables <- list()
 anLables[["is_SM_gene"]] <- "SM gene"
@@ -109,11 +83,10 @@ anLables[["gene_length"]] <- "Gene Length"
 
 ##################################################################################
 
-## genes to read
+## genes to read and annotations
 geneSet <- suppressMessages(
   readr::read_tsv(file = file_genes, col_names = c("chr", "start", "end", "geneId", "score", "strand"))
-) %>% 
-  dplyr::select(geneId)
+)
 
 geneDesc <- suppressMessages(
   AnnotationDbi::select(x = orgDb, keys = geneSet$geneId,
@@ -134,6 +107,21 @@ geneInfo <- dplyr::left_join(x = geneSet, y = geneDesc, by = c("geneId" = "GID")
 
 glimpse(geneInfo)
 
+## polII ratio configuration
+polIIRatioConf <- suppressMessages(readr::read_tsv(file = file_polIIRatioConf)) %>% 
+  dplyr::filter(comparison %in% polIIPairs)
+
+polIIDiffPairs <- purrr::transpose(polIIRatioConf)  %>% 
+  purrr::set_names(nm = purrr::map(., "comparison"))
+
+polII1 <- polIIDiffPairs[[mainPolIIPair]]$group1
+polII2 <- polIIDiffPairs[[mainPolIIPair]]$group2
+
+
+tf1 <- tfDiffPairs[[mainTfPair]]$samples[1]
+tf2 <- tfDiffPairs[[mainTfPair]]$samples[2]
+
+
 ##################################################################################
 
 ## read the experiment sample details and select only those which are to be plotted
@@ -142,19 +130,22 @@ tfData <- get_sample_information(
   exptInfoFile = file_exptInfo,
   samples = unique(purrr::map(tfDiffPairs, "samples") %>% unlist() %>% unname()),
   dataPath = TF_dataPath,
-  profileMatrixSuffix = matrixType)
+  profileMatrixSuffix = matrixType
+)
 
 polIIData <- get_sample_information(
   exptInfoFile = file_exptInfo,
-  samples = unique(purrr::map(polIIDiffPairs, "samples") %>% unlist() %>% unname()),
+  samples = unique(purrr::map(polIIDiffPairs, `[`, c("group2", "group1")) %>% unlist() %>% unname()),
   dataPath = polII_dataPath,
-  profileMatrixSuffix = matrixType)
+  profileMatrixSuffix = "normalized_profile"
+)
 
 histData <- get_sample_information(
   exptInfoFile = file_exptInfo,
   samples = otherHist,
   dataPath = hist_dataPath,
-  profileMatrixSuffix = matrixType)
+  profileMatrixSuffix = matrixType
+)
 
 exptData <- dplyr::bind_rows(tfData, polIIData, histData)
 exptDataList <- purrr::transpose(exptData)  %>% 
@@ -185,9 +176,9 @@ expressionData <- get_polII_expressions(exptInfo = exptData,
 for (i in names(polIIDiffPairs)) {
   expressionData <- get_fold_change(
     df = expressionData,
-    nmt = polIIDiffPairs[[i]]$samples[2],
-    dmt = polIIDiffPairs[[i]]$samples[1],
-    newCol = polIIDiffPairs[[i]]$name,
+    nmt = polIIDiffPairs[[i]]$group1,
+    dmt = polIIDiffPairs[[i]]$group2,
+    newCol = polIIDiffPairs[[i]]$comparison,
     isExpressedCols = polIICols$is_expressed)
 }
 
@@ -202,18 +193,23 @@ expressionData %>%
   dplyr::summarise(n = n())
 
 
-expressionData$group <- dplyr::group_by_at(expressionData, unname(tfCols$hasPeak[c(tf1, tf2)])) %>%
-  dplyr::group_indices()
+expressionData <- dplyr::group_by_at(expressionData, unname(tfCols$hasPeak[c(tf1, tf2)])) %>%
+  dplyr::mutate(
+    group = paste(sprintf(fmt = "%02d", cur_group_id()), " (n=", n(), ")", sep = "")
+  ) %>% 
+  dplyr::ungroup()
 
 
-readr::write_tsv(x = expressionData,file = paste(outPrefix, "_data.tab", sep = ""))
+readr::write_tsv(x = expressionData, file = paste(outPrefix, ".data.tab", sep = ""))
 
-view(dfSummary(expressionData))
+glimpse(expressionData)
 
 ## peak data
-hasPeakDf <- dplyr::filter_at(.tbl = expressionData,
-                              .vars = vars(unname(tfCols$hasPeak[c(tf1, tf2)])),
-                              .vars_predicate = any_vars(. == "TRUE"))
+hasPeakDf <- dplyr::filter_at(
+  .tbl = expressionData,
+  .vars = vars(unname(tfCols$hasPeak[c(tf1, tf2)])),
+  .vars_predicate = any_vars(. == "TRUE")
+)
 
 dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(unname(tfCols$hasPeak[c(tf1, tf2)]), group)) %>%
   dplyr::summarise(n = n())
@@ -221,10 +217,8 @@ dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(unname(tfCols$hasPeak[c(tf1, t
 ## check the MA plot
 plot_MA_gg(df = expressionData, s1 = polII2, s2 = polII1, title = "MA plot", colorCol = "group")
 # plot_MA_gg(df = expressionData, s1 = polII1, s2 = polII2, title = "MA plot", colorCol = "group")
-plot_MA_gg(df = expressionData, s1 = polIIDiffPairs$p2$samples[1],
-           s2 = polIIDiffPairs$p2$samples[2], title = "MA plot", colorCol = "group")
-# plot_MA_gg(df = expressionData, title = "MA plot", colorCol = "group",
-#            s1 = polIIDiffPairs$p2$samples[1], s2 = polIIDiffPairs$p2$samples[2])
+plot_MA_gg(df = expressionData, s1 = polIIDiffPairs[[2]]$group2,
+           s2 = polIIDiffPairs[[2]]$group1, title = "MA plot", colorCol = "group")
 
 
 plot_scatter(df = expressionData, s1 = polII1, s2 = polII2, title = "Scatter plot", colorCol = "group")
@@ -236,7 +230,7 @@ peakCovDf <- tidyr::gather(data = hasPeakDf, key = "sampleId", value = "coverage
     sampleId = gsub(pattern = "peakCoverage.", replacement = "", x = sampleId, fixed = T),
     tf = gsub(pattern = "An_(\\w+)_(20h|48h)_HA_1", replacement = "\\1", x = sampleId, perl = T),
     time = gsub(pattern = "An_(\\w+)_(20h|48h)_HA_1", replacement = "\\2", x = sampleId, perl = T)) %>% 
-  as.tibble()
+  as_tibble()
 
 ggplot(data = peakCovDf,
        mapping = aes(x = coverage, group = sampleId, color = tf, linetype = time)) +
@@ -258,8 +252,6 @@ ggplot(data = peakCovDf,
 # clusterInfo <- fread(file = clusterStorePath, sep = "\t", header = T, stringsAsFactors = F)
 # 
 # expressionData <- dplyr::left_join(x = expressionData, y = clusterInfo, by = c("geneId" = "geneId"))
-
-
 
 
 ##################################################################################
@@ -307,39 +299,13 @@ polII_color <- colorRamp2(
 
 
 ## polII signal fold change matrix
-lfcMat <- as.matrix(expressionData[, purrr::map_chr(polIIDiffPairs, "name"), drop = FALSE])
+lfcMat <- as.matrix(expressionData[, purrr::map_chr(polIIDiffPairs, "comparison"), drop = FALSE])
 rownames(lfcMat) <- expressionData$geneId
 
 lfc_color <- colorRamp2(
   breaks = c(-2, -1, -0.5, 0, 0.5, 1, 2),
   colors = RColorBrewer::brewer.pal(n = 7, name = "PuOr")
 )
-
-##################################################################################
-
-# ## peak pval heatmap
-# quantile(hasPeakDf[, tfCols$pval], c(seq(0, 0.9, by = 0.1), 0.95, 0.99, 0.992, 0.995, 0.999, 0.9999, 1), na.rm = T)
-# 
-# peakPvalCol <- colorRamp2(breaks = c(0, 1, quantile(hasPeakDf[, tfCols$pval], c(0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9, 0.95), na.rm = T)),
-#                           colors = c("grey", "white", RColorBrewer::brewer.pal(n = 9, name = "YlOrRd")))
-# 
-# 
-# macs2Ht <- signal_heatmap(log2_matrix = hasPeakDf[, tfCols$pval],
-#                           htName = "macs2_peak",
-#                           col_title = tfCols$pval,
-#                           legend_title = "log10(macs2_peak)",
-#                           color = peakPvalCol,
-#                           htSplit = hasPeakDf["group"],
-#                           cluster_rows = TRUE, cluster_columns = FALSE)
-# 
-# 
-# polIIMat_peaks <- polIIMat[hasPeakDf$geneId , ]
-# 
-# polIIht_peaks <- signal_heatmap(log2_matrix = polIIMat,
-#                                 htName = "polII_exp",
-#                                 col_title = polII_ids,
-#                                 legend_title = "log2(polII_singal)",
-#                                 color = polII_color)
 
 ##################################################################################
 ## colors for profile matrix
@@ -389,6 +355,17 @@ tfWiseColors <- sapply(
   }
 )
 
+## polII colors
+polIIMeanProfile <- NULL
+polIIColorList <- NULL
+if(nrow(polIIData) == 1){
+  polIIMeanProfile <- matList[[polIIData$sampleId]]
+} else{
+  polIIMeanProfile <- getSignalsFromList(lt = matList[polIIData$sampleId])
+}
+quantile(polIIMeanProfile, c(seq(0, 0.9, by = 0.1), 0.95, 0.99, 0.992, 0.995, 0.999, 0.9999, 1), na.rm = T)
+polIIMeanColor <- colorRamp2(quantile(polIIMeanProfile, c(0.01, 0.5, 0.995), na.rm = T), c("blue", "white", "red"))
+polIIColorList <- sapply(X = polIIData$sampleId, FUN = function(x){return(polIIMeanColor)})
 
 ## histone colors
 histMeanProfile <- NULL
@@ -412,26 +389,6 @@ histColorList <- sapply(
 )
 
 ## LFC(TF2/TF1) matrix
-## adding Tf1's median to TF2 matrix and vice a versa. Doing this will remove the background skewness of fold change
-## matrix and the median will be around 0
-tfLfcMat <- log2((matList[[tf2]] + quantile(matList[[tf1]], 0.5)) / (matList[[tf1]] + quantile(matList[[tf2]], 0.5)))
-
-quantile(log2((matList[[tf2]] + quantile(matList[[tf2]], 0.5)) / (matList[[tf1]] + quantile(matList[[tf1]], 0.5))),
-         c(0, 0.01, 0.05, seq(0.1, 0.9, by = 0.1), 0.95, 0.99, 1))
-
-plot(density(log2((matList[[tf2]] + quantile(matList[[tf1]], 0.5)) / (matList[[tf1]] + quantile(matList[[tf2]], 0.5))),
-             na.rm = TRUE)
-)
-
-lfcProfileCol <- colorRamp2(breaks = c(-2, -1.5, -1, -0.75, 0, 0.75, 1, 1.5, 2),
-                            colors = RColorBrewer::brewer.pal(n = 9, name = "PuOr"))
-
-## scalled LFC matrix
-tfScalledLfcMat <- scale(x = tfLfcMat, center = TRUE, scale = TRUE)
-
-quantile(tfScalledLfcMat,
-         c(0, 0.005, 0.01, 0.05, seq(0.1, 0.9, by = 0.1), 0.95, 0.99, 0.995, 1))
-
 ## TF1 scalled matrix
 tf1ScalledMat <- scale(x = matList[[tf1]], center = TRUE, scale = TRUE)
 quantile(tf1ScalledMat, c(seq(0, 0.9, by = 0.1), 0.95, 0.99, 0.992, 0.995, 0.999, 0.9999, 1), na.rm = T)
@@ -451,14 +408,17 @@ tf2ScalledColor <- colorRamp2(
 ## Difference between TF2 and TF1 scalled matrix
 scalledTfDiffMat <- tf2ScalledMat - tf1ScalledMat
 plot(density(scalledTfDiffMat))
-quantile(scalledTfDiffMat, c(0, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.02, 0.05, seq(0.1, 0.9, by = 0.1), 0.95, 0.99, 0.992, 0.995, 0.999, 0.9999, 1), na.rm = T)
+quantile(
+  x = scalledTfDiffMat,
+  c(0, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.02, 0.05, seq(0.1, 0.9, by = 0.1),
+    0.95, 0.99, 0.992, 0.995, 0.999, 0.9999, 1), na.rm = T
+)
 
 
 scalledTfDiffColor <- colorRamp2(
   breaks = c(-3, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 3),
   colors = RColorBrewer::brewer.pal(n = 11, name = "PuOr")
 )
-
 
 ##################################################################################
 ## genes which have peak in both TFs and polII signal in either one or both TFs
@@ -476,17 +436,23 @@ peakExpDf <- dplyr::filter_at(
 peakExpDf <- dplyr::mutate(
   peakExpDf,
   group = case_when(
-    !! as.name(polIIDiffPairs$p1$name) >= 2 ~ "G1: LFC >= 2",
-    !! as.name(polIIDiffPairs$p1$name) >= 1 ~ "G2: 1 <= LFC < 2",
-    !! as.name(polIIDiffPairs$p1$name) >= 0.5 ~ "G3: 0.5 <= LFC < 1",
-    !! as.name(polIIDiffPairs$p1$name) >= 0 ~ "G4: 0 <= LFC < 0.5",
-    !! as.name(polIIDiffPairs$p1$name) <= -2 ~ "G8: -2 >= LFC",
-    !! as.name(polIIDiffPairs$p1$name) <= -1 ~ "G7: -2 < LFC <= -1",
-    !! as.name(polIIDiffPairs$p1$name) <= -0.5 ~ "G6: -1 < LFC <= -0.5",
-    !! as.name(polIIDiffPairs$p1$name) < 0 ~ "G5: -0.5 < LFC < 0",
+    !! as.name(polIIDiffPairs[[mainPolIIPair]]$comparison) >= 2 ~ "G1: LFC >= 2",
+    !! as.name(polIIDiffPairs[[mainPolIIPair]]$comparison) >= 1 ~ "G2: 1 <= LFC < 2",
+    !! as.name(polIIDiffPairs[[mainPolIIPair]]$comparison) >= 0.5 ~ "G3: 0.5 <= LFC < 1",
+    !! as.name(polIIDiffPairs[[mainPolIIPair]]$comparison) >= 0 ~ "G4: 0 <= LFC < 0.5",
+    !! as.name(polIIDiffPairs[[mainPolIIPair]]$comparison) <= -2 ~ "G8: -2 >= LFC",
+    !! as.name(polIIDiffPairs[[mainPolIIPair]]$comparison) <= -1 ~ "G7: -2 < LFC <= -1",
+    !! as.name(polIIDiffPairs[[mainPolIIPair]]$comparison) <= -0.5 ~ "G6: -1 < LFC <= -0.5",
+    !! as.name(polIIDiffPairs[[mainPolIIPair]]$comparison) < 0 ~ "G5: -0.5 < LFC < 0",
     TRUE ~ "0"
   )
-)
+) %>% 
+  dplyr::group_by(group) %>% 
+  dplyr::mutate(
+    group = paste(group, "\n(n=", n(), ")", sep = "")
+  ) %>% 
+  dplyr::ungroup()
+  
 
 plot_scatter(df = peakExpDf, s1 = polII1, s2 = tfCols$peakCoverage[tf2], title = "Scatter plot", colorCol = "group")
 plot_MA_gg(df = peakExpDf, s1 = tfCols$peakCoverage[tf2], s2 = tfCols$peakCoverage[tf1], colorCol = "group")
@@ -497,15 +463,14 @@ dplyr::group_by(peakExpDf, group) %>%
   readr::write_tsv(file = paste(outPrefix_peakExp, ".stats.tab", sep = ""))
 
 
-peakExp_clusters <- dplyr::select(peakExpDf, geneId, group) %>% 
-  dplyr::rename(cluster = group)
+peakExp_clusters <- dplyr::select(peakExpDf, geneId, cluster = group)
 
 
 ## profile heatmap: no need to include input
 multiProf_peakExp <- multi_profile_plots(
   exptInfo = tfData[tfData$sampleId %in% tfIds, ],
   genesToPlot = peakExpDf$geneId,
-  matSource = matrixType,
+  # matSource = matrixType,
   matBins = matrixDim,
   clusters = peakExp_clusters,
   profileColors = tfWiseColors,
@@ -513,6 +478,17 @@ multiProf_peakExp <- multi_profile_plots(
   column_title_gp = gpar(fontsize = 12)
 )
 
+## polII profile plots
+polIIProf_peakExp <- multi_profile_plots(
+  exptInfo = polIIData,
+  genesToPlot = peakExpDf$geneId,
+  clusters = peakExp_clusters,
+  drawClusterAn = FALSE,
+  matSource = "deeptools",
+  matBins = c(200, 200, 100, 10),
+  profileColors = polIIColorList,
+  column_title_gp = gpar(fontsize = 12)
+)
 
 ## Scalled TF diff profile
 scalledTfDiffProf_peakExp <- profile_heatmap(
@@ -526,7 +502,7 @@ scalledTfDiffProf_peakExp <- profile_heatmap(
 
 
 ## polII signal heatmap
-polIIMat_peakExp <- polIIMat[peakExpDf$geneId, ]
+polIIMat_peakExp <- polIIMat[peakExpDf$geneId, polII_ids]
 
 polIIht_peakExp <- signal_heatmap(
   log2_matrix = polIIMat_peakExp,
@@ -544,7 +520,6 @@ lfc_peakExp <- lfcMat[peakExpDf$geneId, ]
 lfcHt_peakExp <- signal_heatmap(
   log2_matrix = lfc_peakExp,
   htName = "polII_lfc",
-  col_title = purrr::map_chr(polIIDiffPairs, "title"),
   legend_title = "log2(fold change)",
   color = lfc_color,
   column_title_gp = gpar(fontsize = 12),
@@ -558,22 +533,24 @@ gl_peakExp <- gene_length_heatmap_annotation(
 )
 
 htlist_peakExp <- gl_peakExp$an +
-  lfcHt_peakExp + 
   polIIht_peakExp +
+  lfcHt_peakExp + 
   multiProf_peakExp$heatmapList +
-  scalledTfDiffProf_peakExp$heatmap
+  scalledTfDiffProf_peakExp$heatmap +
+  polIIProf_peakExp$heatmapList
 
 
 
 if( all(rownames(multiProf_peakExp$profileHeatmaps[[1]]$heatmap@matrix) == peakExpDf$geneId) ){
   ## row order by polII LFC
-  rowOrd_peakExp <- order(peakExpDf[[ polIIDiffPairs$p1$name ]], decreasing = TRUE)
+  rowOrd_peakExp <- order(peakExpDf[[ polIIDiffPairs[[mainPolIIPair]]$comparison ]], decreasing = TRUE)
 }
 
 
-title_peakExp <- "TF binding vs polII transcription: genes bound both at 20h and 48h and atleast one timepoint showing polII signal "
+title_peakExp <- paste("TF binding vs polII transcription: genes bound both at 20h and 48h and atleast one timepoint showing polII signal (n=", nrow(peakExpDf), ")", sep = "")
 
 pdfWd <- 4 + (length(multiProf_peakExp$profileHeatmaps) * 3) + 3 +
+  (length(polIIProf_peakExp$profileHeatmaps) * 3) +
   (length(polII_ids) * 0.5 * showExpressionHeatmap) + 
   (length(polIIDiffPairs) * 0.5)
 
@@ -638,13 +615,9 @@ dev.off()
 
 ##################################################################################
 ## profile plot with genes showing peak specific and common between the conditions
-# tfSpecificDf <- dplyr::filter(hasPeakDf,
-#                               !! as.name(tfCols$hasPeak[tf1]) == FALSE | !! as.name(tfCols$hasPeak[tf2]) == FALSE )
-
 tfSpecificDf <- hasPeakDf
 
-clusters_tfSpecific <- dplyr::select(tfSpecificDf, geneId, group) %>% 
-  dplyr::rename(cluster = group)
+clusters_tfSpecific <- dplyr::select(tfSpecificDf, geneId, cluster = group)
 
 ylimList <- sapply(X = tfData$sampleId, FUN = function(x){c(0, 30)}, USE.NAMES = T, simplify = F)
 
@@ -660,6 +633,17 @@ multiProf_tfSpecific <- multi_profile_plots(
   ylimFraction = ylimList
 )
 
+## polII profile plots
+polIIProf_tfSpecific <- multi_profile_plots(
+  exptInfo = polIIData,
+  genesToPlot = tfSpecificDf$geneId,
+  clusters = clusters_tfSpecific,
+  drawClusterAn = FALSE,
+  matSource = "deeptools",
+  matBins = c(200, 200, 100, 10),
+  profileColors = polIIColorList,
+  column_title_gp = gpar(fontsize = 12)
+)
 
 ## Scalled TF diff profile
 scalledTfDiffProf_tfSpecific <- profile_heatmap(
@@ -683,7 +667,7 @@ histProfiles <- multi_profile_plots(
 )
 
 ## polII signal heatmap
-polIIMat_tfSpecific <- polIIMat[tfSpecificDf$geneId, ]
+polIIMat_tfSpecific <- polIIMat[tfSpecificDf$geneId, polII_ids]
 
 polIIHt_tfSpecific <- signal_heatmap(
   log2_matrix = polIIMat_tfSpecific,
@@ -701,7 +685,6 @@ lfc_tfSpecific <- lfcMat[tfSpecificDf$geneId, ]
 lfc_heatmap <- signal_heatmap(
   log2_matrix = lfc_tfSpecific,
   htName = "polII_lfc",
-  col_title = purrr::map_chr(polIIDiffPairs, "title"),
   legend_title = "log2(fold change)",
   color = lfc_color,
   column_title_gp = gpar(fontsize = 12),
@@ -719,6 +702,7 @@ htlist_tfSpecific <- gl_tfSpecific$an +
   scalledTfDiffProf_tfSpecific$heatmap +
   polIIHt_tfSpecific + 
   lfc_heatmap +
+  polIIProf_tfSpecific$heatmapList +
   histProfiles$heatmapList
 
 
@@ -734,6 +718,7 @@ title_tfSpecific <- "Differential binding of kdmB at 20h and 48h"
 pdfWd <- 2 + (length(multiProf_tfSpecific$profileHeatmaps) * 2) + 3 +
   (length(polII_ids) * 0.5 * showExpressionHeatmap) + 
   (length(polIIDiffPairs) * 0.5) + 
+  (length(polIIProf_tfSpecific$profileHeatmaps) * 2) +
   (length(histProfiles$profileHeatmaps) * 2) + 3
 
 # draw Heatmap and add the annotation name decoration
@@ -755,25 +740,21 @@ dev.off()
 ##################################################################################
 ## genes with either peak detected or with top 10% polII signal 
 
-expressionData %>% 
-  dplyr::group_by_at(.vars = vars(unname(c(tfCols$hasPeak[c(tf1, tf2)], polIICols$is_expressed[c(polII1, polII2)])))) %>% 
-  dplyr::summarise(n = n())
-
-tfPolIIDf <- dplyr::filter_at(
-  .tbl = expressionData,
-  .vars = unname(c(tfCols$hasPeak[c(tf1, tf2)], polIICols$is_expressed[c(polII1, polII2)])),
-  .vars_predicate = any_vars(. == TRUE)
-)
-
-tfPolIIDf$group <- tfPolIIDf %>% 
+tfPolIIDf <- dplyr::select(expressionData, -group) %>% 
+  dplyr::filter_at(
+    .vars = unname(c(tfCols$hasPeak[c(tf1, tf2)], polIICols$is_expressed[c(polII1, polII2)])),
+    .vars_predicate = any_vars(. == TRUE)
+  ) %>% 
   dplyr::group_by_at(
     .vars = vars(unname(c(tfCols$hasPeak[c(tf1, tf2)], polIICols$is_expressed[c(polII1, polII2)])))
   ) %>% 
-  dplyr::group_indices()
+  dplyr::mutate(
+    group = paste(sprintf(fmt = "%02d", cur_group_id()), " (n=", n(), ")", sep = "")
+  ) %>% 
+  dplyr::ungroup()
 
-tfpolII_clusters <- dplyr::mutate(tfPolIIDf, group = sprintf(fmt = "%02d", group)) %>% 
-  dplyr::select(geneId, group) %>% 
-  dplyr::rename(cluster = group)
+
+tfpolII_clusters <- dplyr::select(tfPolIIDf, geneId, cluster = group)
 
 tfPolIIDf %>% 
   dplyr::group_by_at(
@@ -792,6 +773,17 @@ multiProf_tfPolII <- multi_profile_plots(
   clusters = tfpolII_clusters
 )
 
+## polII profile plots
+polIIProf_tfPolII <- multi_profile_plots(
+  exptInfo = polIIData,
+  genesToPlot = tfPolIIDf$geneId,
+  clusters = tfpolII_clusters,
+  drawClusterAn = FALSE,
+  matSource = "deeptools",
+  matBins = c(200, 200, 100, 10),
+  profileColors = polIIColorList,
+  column_title_gp = gpar(fontsize = 12)
+)
 
 ## Scalled TF diff profile
 scalledTfDiffProf_tfPolII <- profile_heatmap(
@@ -802,7 +794,7 @@ scalledTfDiffProf_tfPolII <- profile_heatmap(
 )
 
 ## polII signal heatmap
-polIIMat_tfPolII <- polIIMat[tfPolIIDf$geneId, ]
+polIIMat_tfPolII <- polIIMat[tfPolIIDf$geneId, polII_ids]
 
 polIIht_tfPolII <- signal_heatmap(
   log2_matrix = polIIMat_tfPolII,
@@ -820,7 +812,6 @@ lfc_tfPolII <- lfcMat[tfPolIIDf$geneId, ]
 lfcHt_tfPolII <- signal_heatmap(
   log2_matrix = lfc_tfPolII,
   htName = "polII_lfc",
-  col_title = purrr::map_chr(polIIDiffPairs, "title"),
   legend_title = "log2(fold change)",
   color = lfc_color,
   column_title_gp = gpar(fontsize = 12),
@@ -836,14 +827,18 @@ gl_tfPolII <- gene_length_heatmap_annotation(
 htlist_tfPolII <- gl_tfPolII$an +
   multiProf_tfPolII$heatmapList +
   scalledTfDiffProf_tfPolII$heatmap +
-  polIIht_tfPolII + lfcHt_tfPolII
+  polIIht_tfPolII + lfcHt_tfPolII +
+  polIIProf_tfPolII$heatmapList
 
 
 
 if( all(rownames(multiProf_tfPolII$profileHeatmaps[[1]]$heatmap@matrix) == tfPolIIDf$geneId) ){
   ## order by peak distance
-  rowOrd_tfPolII <- order(tfPolIIDf[[ tfCols$peakDist[tf1] ]], tfPolIIDf[[ polIIDiffPairs$p1$name ]],
-                          decreasing = TRUE)
+  rowOrd_tfPolII <- order(
+    tfPolIIDf[[ tfCols$peakDist[tf1] ]],
+    tfPolIIDf[[ polIIDiffPairs[[mainPolIIPair]]$comparison ]],
+    decreasing = TRUE
+  )
 }
 
 
@@ -852,14 +847,14 @@ title_tfPolII <- "Differential binding of TF at 20h and 48h: genes with macs2 pe
 
 pdfWd <- 2 + (length(multiProf_tfPolII$profileHeatmaps) * 3.5) + 3 +
   (length(polII_ids) * 0.5 * showExpressionHeatmap) + 
+  (length(polIIProf_tfPolII$profileHeatmaps) * 3.5) +
   (length(polIIDiffPairs) * 0.5)
 
 # draw Heatmap and add the annotation name decoration
-pdf(file = paste0(outPrefix_tfPolII, "_profile.pdf", collapse = ""), width = pdfWd, height = 12)
+pdf(file = paste0(outPrefix_tfPolII, ".profile.pdf", collapse = ""), width = pdfWd, height = 12)
 
 draw(htlist_tfPolII,
      main_heatmap = tfData$profileName[1],
-     # annotation_legend_list = list(profile1$legend),
      column_title = title_tfPolII,
      column_title_gp = gpar(fontsize = 14, fontface = "bold"),
      row_sub_title_side = "left",
@@ -868,9 +863,7 @@ draw(htlist_tfPolII,
      padding = unit(rep(0.5, times = 4), "cm")
 )
 
-
 dev.off()
-
 
 ##################################################################################
 
