@@ -1,7 +1,7 @@
 suppressPackageStartupMessages(library(chipmine))
 suppressPackageStartupMessages(library(org.Anidulans.FGSCA4.eg.db))
 suppressPackageStartupMessages(library(scales))
-suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(summarytools))
 
 
@@ -16,7 +16,7 @@ source(file = "https://raw.githubusercontent.com/lakhanp1/omics_utils/master/04_
 
 ##################################################################################
 ## main configuration
-comparisonName <- "kdmB_48h_vs_20h.2"
+comparisonName <- "kdmB_48h_vs_20h"
 outDir <- here::here("analysis", "05_KERS_48h_vs_20h", comparisonName)
 outPrefix <- paste(outDir, "/", comparisonName, sep = "")
 
