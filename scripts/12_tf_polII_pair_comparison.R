@@ -75,12 +75,6 @@ outPrefix_tfPolII <- paste(outPrefix, ".tfPolII", sep = "")
 outPrefix_tfSpecific <- paste(outPrefix, ".specific_binding", sep = "")
 outPrefix_peakExp <- paste(outPrefix, ".pkExpGenes", sep = "")
 
-anLables <- list()
-anLables[["is_SM_gene"]] <- "SM gene"
-anLables[["is_TF"]] <- "Transcription Factor"
-anLables[["gene_length"]] <- "Gene Length"
-
-
 ##################################################################################
 
 ## genes to read and annotations
