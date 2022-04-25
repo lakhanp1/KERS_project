@@ -12,8 +12,8 @@ rm(list = ls())
 ##################################################################################
 
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
-comparisonName <- "geneset2_sex_asex_20h"
-workDir <- here::here("analysis", "03_KERS_complex", "KERS_complex_20h", comparisonName)
+comparisonName <- "geneset1_48h"
+workDir <- here::here("analysis", "03_KERS_complex", comparisonName)
 outPrefix <- paste(workDir, "/", comparisonName, sep = "")
 
 file_plotSamples <- paste(workDir, "/", "samples.txt", sep = "")
@@ -109,8 +109,9 @@ tfCols <- sapply(
 ##################################################################################
 
 ## genes to read
-geneSet <- data.table::fread(file = file_genes, header = F,
-                             col.names = c("chr", "start", "end", "geneId", "score", "strand"))
+geneSet <- data.table::fread(
+  file = file_genes, header = F,
+  col.names = c("chr", "start", "end", "geneId", "score", "strand"))
 
 kmClust <- dplyr::left_join(
   x = suppressMessages(readr::read_tsv(file = tfData$clusterFile[1])),
@@ -285,7 +286,7 @@ ylimList <- append(x = ylimList,
 # plot profiles for genes of interest
 
 geneSubset <- suppressMessages(
-  readr::read_tsv(file = file_geneSubset)
+  readr::read_tsv(file = file_geneSubset, comment = "#")
 )
 
 geneSubset <- dplyr::left_join(x = geneSubset, y = peakTargetMat, by = "geneId") %>% 
@@ -302,9 +303,10 @@ multiProfiles_geneset <- multi_profile_plots(
   showAnnotation = FALSE,
   profileColors = colorList,
   column_title_gp = gpar(fontsize = 12),
-  # row_order = geneSubset$geneId,
-  # show_row_names = TRUE,
-  # row_labels = geneSubset$geneName,
+  row_order = geneSubset$geneId,
+  show_row_names = TRUE,
+  row_names_side = "left",
+  row_labels = geneSubset$geneName,
   ylimFraction = ylimList
 )
 
@@ -321,9 +323,9 @@ anGl_geneset <- gene_length_heatmap_annotation(
   axis_param = list(at = c(2000, 4000), labels = c("2kb", "> 4kb")),
   pointSize = unit(4, "mm"))
 
-
-geneset_htlist <- anGl_geneset$an +
-  multiProfiles_geneset$heatmapList
+geneset_htlist <- NULL
+# geneset_htlist <- anGl_geneset$an
+geneset_htlist <- geneset_htlist + multiProfiles_geneset$heatmapList
 
 
 
@@ -331,7 +333,7 @@ geneset_htlist <- anGl_geneset$an +
 title_geneset = paste(comparisonName, ": genes of interest", collapse = "")
 
 # draw Heatmap and add the annotation name decoration
-pdf(file = paste(outPrefix_geneset, ".profiles.pdf", sep = ""), width = pdfWd, height = 12)
+pdf(file = paste(outPrefix_geneset, ".profiles.pdf", sep = ""), width = 8, height = 6)
 
 geneset_htlist <- draw(geneset_htlist,
                        main_heatmap = exptData$profileName[1],

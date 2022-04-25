@@ -127,26 +127,26 @@ tfData <- get_sample_information(
   profileMatrixSuffix = matrixType
 )
 
-polIIData <- get_sample_information(
+polII_info <- get_sample_information(
   exptInfoFile = file_exptInfo,
   samples = unique(purrr::map(polIIDiffPairs, `[`, c("group2", "group1")) %>% unlist() %>% unname()),
   dataPath = polII_dataPath,
   profileMatrixSuffix = "normalized_profile"
 )
 
-histData <- get_sample_information(
+histInfo <- get_sample_information(
   exptInfoFile = file_exptInfo,
   samples = otherHist,
   dataPath = hist_dataPath,
   profileMatrixSuffix = matrixType
 )
 
-exptData <- dplyr::bind_rows(tfData, polIIData, histData)
-exptDataList <- purrr::transpose(exptData)  %>% 
+exptInfo <- dplyr::bind_rows(tfData, polII_info, histInfo)
+exptInfoList <- purrr::transpose(exptInfo)  %>% 
   purrr::set_names(nm = purrr::map(., "sampleId"))
 
-polII_ids <- exptData$sampleId[which(exptData$IP_tag == "polII")]
-tfIds <- exptData$sampleId[which(exptData$IP_tag %in% c("HA", "MYC", "TAP") & exptData$TF != "untagged")]
+polII_ids <- exptInfo$sampleId[which(exptInfo$IP_tag == "polII")]
+tfIds <- exptInfo$sampleId[which(exptInfo$IP_tag %in% c("HA", "MYC", "TAP") & exptInfo$TF != "untagged")]
 
 
 polIICols <- list(
@@ -163,7 +163,7 @@ tfCols <- sapply(
   simplify = F, USE.NAMES = T)
 
 
-expressionData <- get_polII_expressions(exptInfo = exptData,
+expressionData <- get_polII_expressions(exptInfo = exptInfo,
                                         genesDf = geneInfo)
 
 ## add fold change columns
@@ -238,7 +238,7 @@ ggplot(data = peakCovDf,
 
 ## join the profile matrices and do clustering
 # mergedKm = merged_profile_matrix_cluster(name = comparisonName,
-#                                          exptInfo = exptData,
+#                                          exptInfo = exptInfo,
 #                                          genes = geneSet$geneId,
 #                                          clusterStorePath = clusterStorePath,
 #                                          k = 12)
@@ -304,7 +304,7 @@ lfc_color <- colorRamp2(
 ##################################################################################
 ## colors for profile matrix
 matList <- import_profiles(
-  exptInfo = exptData,
+  exptInfo = exptInfo,
   geneList = geneInfo$geneId,
   source = matrixType,
   up = matrixDim[1], target = matrixDim[2], down = matrixDim[3]
@@ -326,7 +326,7 @@ tfMeanColorList <- sapply(
     return(
       colorRamp2(
         breaks = quantile(tfMeanProfile, c(0.50, 0.995), na.rm = T),
-        colors = unlist(strsplit(x = exptDataList[[x]]$color, split = ","))
+        colors = unlist(strsplit(x = exptInfoList[[x]]$color, split = ","))
       )
     )
   }
@@ -343,7 +343,7 @@ tfWiseColors <- sapply(
     return(
       colorRamp2(
         breaks = quantile(matList[[x]], c(0.50, 0.99), na.rm = T),
-        colors = unlist(strsplit(x = exptDataList[[x]]$color, split = ","))
+        colors = unlist(strsplit(x = exptInfoList[[x]]$color, split = ","))
       )
     )
   }
@@ -352,31 +352,31 @@ tfWiseColors <- sapply(
 ## polII colors
 polIIMeanProfile <- NULL
 polIIColorList <- NULL
-if(nrow(polIIData) == 1){
-  polIIMeanProfile <- matList[[polIIData$sampleId]]
+if(nrow(polII_info) == 1){
+  polIIMeanProfile <- matList[[polII_info$sampleId]]
 } else{
-  polIIMeanProfile <- getSignalsFromList(lt = matList[polIIData$sampleId])
+  polIIMeanProfile <- getSignalsFromList(lt = matList[polII_info$sampleId])
 }
 quantile(polIIMeanProfile, c(seq(0, 0.9, by = 0.1), 0.95, 0.99, 0.992, 0.995, 0.999, 0.9999, 1), na.rm = T)
 polIIMeanColor <- colorRamp2(quantile(polIIMeanProfile, c(0.01, 0.5, 0.995), na.rm = T), c("blue", "white", "red"))
-polIIColorList <- sapply(X = polIIData$sampleId, FUN = function(x){return(polIIMeanColor)})
+polIIColorList <- sapply(X = polII_info$sampleId, FUN = function(x){return(polIIMeanColor)})
 
 ## histone colors
 histMeanProfile <- NULL
 histColorList <- NULL
-if(nrow(histData) == 1){
-  histMeanProfile <- matList[[histData$sampleId]]
+if(nrow(histInfo) == 1){
+  histMeanProfile <- matList[[histInfo$sampleId]]
 } else{
-  histMeanProfile <- getSignalsFromList(lt = matList[histData$sampleId])
+  histMeanProfile <- getSignalsFromList(lt = matList[histInfo$sampleId])
 }
 
 histColorList <- sapply(
-  X = histData$sampleId,
+  X = histInfo$sampleId,
   FUN = function(x){
     return(
       colorRamp2(
         breaks = quantile(histMeanProfile, c(0.20, 0.995), na.rm = T),
-        colors = unlist(strsplit(x = exptDataList[[x]]$color, split = ","))
+        colors = unlist(strsplit(x = exptInfoList[[x]]$color, split = ","))
       )
     )
   }
@@ -388,7 +388,7 @@ tf1ScalledMat <- scale(x = matList[[tf1]], center = TRUE, scale = TRUE)
 quantile(tf1ScalledMat, c(seq(0, 0.9, by = 0.1), 0.95, 0.99, 0.992, 0.995, 0.999, 0.9999, 1), na.rm = T)
 tf1ScalledColor <- colorRamp2(
   breaks = quantile(tf1ScalledMat, c(0.50, 0.99), na.rm = T),
-  colors = unlist(strsplit(x = exptDataList[[tf1]]$color, split = ","))
+  colors = unlist(strsplit(x = exptInfoList[[tf1]]$color, split = ","))
 )
 
 ## TF2 scalled matrix
@@ -396,7 +396,7 @@ tf2ScalledMat <- scale(x = matList[[tf2]], center = TRUE, scale = TRUE)
 quantile(tf2ScalledMat, c(seq(0, 0.9, by = 0.1), 0.95, 0.99, 0.992, 0.995, 0.999, 0.9999, 1), na.rm = T)
 tf2ScalledColor <- colorRamp2(
   breaks = quantile(tf2ScalledMat, c(0.50, 0.99), na.rm = T),
-  colors = unlist(strsplit(x = exptDataList[[tf2]]$color, split = ","))
+  colors = unlist(strsplit(x = exptInfoList[[tf2]]$color, split = ","))
 )
 
 ## Difference between TF2 and TF1 scalled matrix
@@ -474,7 +474,7 @@ multiProf_peakExp <- multi_profile_plots(
 
 ## polII profile plots
 polIIProf_peakExp <- multi_profile_plots(
-  exptInfo = polIIData,
+  exptInfo = polII_info,
   genesToPlot = peakExpDf$geneId,
   clusters = peakExp_clusters,
   drawClusterAn = FALSE,
@@ -629,7 +629,7 @@ multiProf_tfSpecific <- multi_profile_plots(
 
 ## polII profile plots
 polIIProf_tfSpecific <- multi_profile_plots(
-  exptInfo = polIIData,
+  exptInfo = polII_info,
   genesToPlot = tfSpecificDf$geneId,
   clusters = clusters_tfSpecific,
   drawClusterAn = FALSE,
@@ -650,7 +650,7 @@ scalledTfDiffProf_tfSpecific <- profile_heatmap(
 
 ## histone profile plots
 histProfiles <- multi_profile_plots(
-  exptInfo = histData,
+  exptInfo = histInfo,
   genesToPlot = tfSpecificDf$geneId,
   matSource = matrixType,
   matBins = matrixDim,
@@ -769,7 +769,7 @@ multiProf_tfPolII <- multi_profile_plots(
 
 ## polII profile plots
 polIIProf_tfPolII <- multi_profile_plots(
-  exptInfo = polIIData,
+  exptInfo = polII_info,
   genesToPlot = tfPolIIDf$geneId,
   clusters = tfpolII_clusters,
   drawClusterAn = FALSE,

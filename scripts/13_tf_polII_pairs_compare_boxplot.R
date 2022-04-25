@@ -107,20 +107,20 @@ polII2 <- polIIDiffPairs[[polIIComparison]]$group2
 
 ## read the experiment sample details and select only those which are to be plotted
 
-tfData <- get_sample_information(
+tfInfo <- get_sample_information(
   exptInfoFile = file_exptInfo,
   samples = unique(map(tfDiffPairs, "samples") %>% unlist() %>% unname()),
   dataPath = TF_dataPath, profileMatrixSuffix = matrixType
 )
 
-polIIData <- get_sample_information(
+polII_info <- get_sample_information(
   exptInfoFile = file_exptInfo,
   samples = unique(purrr::map(polIIDiffPairs, `[`, c("group2", "group1")) %>% unlist() %>% unname()),
   dataPath = polII_dataPath,
   profileMatrixSuffix = "normalized_profile"
 )
 
-exptData <- dplyr::bind_rows(tfData, polIIData)
+exptData <- dplyr::bind_rows(tfInfo, polII_info)
 
 exptDataList <- purrr::transpose(exptData)  %>% 
   purrr::set_names(nm = purrr::map(., "sampleId"))
@@ -157,7 +157,7 @@ for (i in names(polIIDiffPairs)) {
     isExpressedCols = polIICols$is_expressed)
 }
 
-expressionData <- get_TF_binding_data(exptInfo = tfData,
+expressionData <- get_TF_binding_data(exptInfo = tfInfo,
                                       genesDf = expressionData)
 
 expressionData %>% 
@@ -215,7 +215,7 @@ longDf$sampleId <- forcats::fct_relevel(.f = longDf$sampleId, names(tfCols$hasPe
 
 ## add TF, time info columns
 longDf <- dplyr::left_join(
-  x = longDf, y = dplyr::select(tfData, sampleId, TF, timepoint), by = "sampleId"
+  x = longDf, y = dplyr::select(tfInfo, sampleId, TF, timepoint), by = "sampleId"
 ) %>% 
   dplyr::arrange(geneId, TF)
 
