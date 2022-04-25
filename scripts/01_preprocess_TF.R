@@ -63,11 +63,17 @@ txInfo <- suppressMessages(
 txInfo <- dplyr::filter(txInfo, !txType %in% c("tRNA", "rRNA", "snRNA", "snoRNA")) %>% 
   dplyr::filter(!grepl(pattern = "uORF", x = geneId))
 
-# tfSampleList <- data.frame(id = c("An_untagged_48h_input_1", "An_untagged_20h_HA_1", "An_untagged_20h_HA_2", "An_untagged_48h_HA_1", "An_untagged_48h_HA_2", "An_untagged_20h_MYC_1", "An_untagged_20h_MYC_2", "An_untagged_48h_MYC_1", "An_untagged_48h_MYC_2"),
-#                           stringsAsFactors = F)
+tfSampleList <- data.frame(
+  id = c("An_untagged_48h_input_1", "An_untagged_20h_HA_1", "An_untagged_20h_HA_2",
+         "An_untagged_48h_HA_1", "An_untagged_48h_HA_2", "An_untagged_20h_MYC_1",
+         "An_untagged_20h_MYC_2", "An_untagged_48h_MYC_1", "An_untagged_48h_MYC_2"),
+  stringsAsFactors = F)
 
-# tfSampleList <- data.frame(id = c("An_kdmB_20h_HA_1", "An_kdmB_laeA_del_20h_HA_2", "An_sudA_20h_HA_1", "An_rpdA_20h_HA_1", "An_sntB_20h_HA_1", "An_ecoA_20h_HA_1", "An_kdmB_48h_HA_1", "An_rpdA_48h_HA_1", "An_sntB_48h_HA_1", "An_sudA_48h_HA_1", "An_ecoA_48h_HA_1"),
-#                            stringsAsFactors = F)
+tfSampleList <- data.frame(
+  id = c("An_kdmB_20h_HA_1", "An_kdmB_laeA_del_20h_HA_2", "An_sudA_20h_HA_1",
+         "An_rpdA_20h_HA_1", "An_sntB_20h_HA_1", "An_ecoA_20h_HA_1", "An_kdmB_48h_HA_1",
+         "An_rpdA_48h_HA_1", "An_sntB_48h_HA_1", "An_sudA_48h_HA_1", "An_ecoA_48h_HA_1"),
+  stringsAsFactors = F)
 
 tfInfo <- get_sample_information(
   exptInfoFile = file_exptInfo,
@@ -130,84 +136,7 @@ for(i in 1:nrow(tfInfo)){
   #     bwFile = tfInfo$bwFile[i],
   #     outFile = tfInfo$peakTargetFile[i])
   # }
-  
-  
-  
-  # ## 2kb - 2kb - 1kb matrix
-  # bwMat <- chipmine::bigwig_profile_matrix(bwFile = tfInfo$bwFile[i],
-  #                                          bedFile = file_genes,
-  #                                          signalName = tfInfo$sampleId[i],
-  #                                          genes = geneSet$gene,
-  #                                          readLocal = FALSE,
-  #                                          storeLocal = TRUE,
-  #                                          localPath = tfInfo$matFile[i])
-  
-  # mat5Kb <- gsub(pattern = ".tab.gz", replacement = "_5kb.tab.gz", x = tfInfo$matFile[i])
-  # 
-  # ## 5kb - 2kb - 1kb matrix
-  # bwMat <- chipmine::bigwig_profile_matrix(bwFile = tfInfo$bwFile[i],
-  #                                          bedFile = file_genes,
-  #                                          signalName = tfInfo$sampleId[i],
-  #                                          genes = geneSet$gene,
-  #                                          readLocal = FALSE,
-  #                                          storeLocal = TRUE,
-  #                                          localPath = mat5Kb,
-  #                                          extend = c(5000, 1000),
-  #                                          target_ratio = 0.25)
-  
-  # matTss <- gsub(pattern = ".tab.gz", replacement = "_4kbTSS2kb.tab.gz", x = tfInfo$matFile[i])
-  # ## -4kb - TSS - 2kb
-  # bwMat <- chipmine::bigwig_profile_matrix(bwFile = tfInfo$bwFile[i],
-  #                                          bedFile = file_genes,
-  #                                          signalName = tfInfo$sampleId[i],
-  #                                          genes = geneSet$gene,
-  #                                          readLocal = FALSE,
-  #                                          storeLocal = TRUE,
-  #                                          localPath = matTss,
-  #                                          extend = c(4000, 2000),
-  #                                          target = "tss")
-  #
-  # matTes <- gsub(pattern = ".tab.gz", replacement = "_2kbTES4kb.tab.gz", x = tfInfo$matFile[i])
-  # ## -2kb - TES - 4kb
-  # bwMat <- chipmine::bigwig_profile_matrix(bwFile = tfInfo$bwFile[i],
-  #                                          bedFile = file_genes,
-  #                                          signalName = tfInfo$sampleId[i],
-  #                                          genes = geneSet$gene,
-  #                                          readLocal = FALSE,
-  #                                          storeLocal = TRUE,
-  #                                          localPath = matTes,
-  #                                          extend = c(2000, 4000),
-  #                                          target = "tes")
-  #
-  # matTss <- gsub(pattern = ".tab.gz", replacement = "_3kbTSS3kb.tab.gz", x = tfInfo$matFile[i])
-  # ## -5kb - TSS - 1kb
-  # bwMat <- chipmine::bigwig_profile_matrix(bwFile = tfInfo$bwFile[i],
-  #                                          bedFile = file_genes,
-  #                                          signalName = tfInfo$sampleId[i],
-  #                                          genes = geneSet$gene,
-  #                                          readLocal = FALSE,
-  #                                          storeLocal = TRUE,
-  #                                          localPath = matTss,
-  #                                          extend = c(3000, 3000),
-  #                                          target = "tss")
-  #
-  #
-  # matTes <- gsub(pattern = ".tab.gz", replacement = "_3kbTES3kb.tab.gz", x = tfInfo$matFile[i])
-  # ## -1kb - TES - 5kb
-  # bwMat <- chipmine::bigwig_profile_matrix(bwFile = tfInfo$bwFile[i],
-  #                                          bedFile = file_genes,
-  #                                          signalName = tfInfo$sampleId[i],
-  #                                          genes = geneSet$gene,
-  #                                          readLocal = FALSE,
-  #                                          storeLocal = TRUE,
-  #                                          localPath = matTes,
-  #                                          extend = c(3000, 3000),
-  #                                          target = "tes")
-  #
-  
-  # print(tfInfo$sampleId[i])
-  
-  
+
 }
 
 
