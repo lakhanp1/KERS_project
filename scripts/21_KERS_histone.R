@@ -137,7 +137,11 @@ expressionData <- get_TF_binding_data(
 
 expressionData <- get_polII_expressions(
   exptInfo = polIIData, genesDf = expressionData
-)
+) %>% 
+  dplyr::mutate_at(
+    .vars = vars(unname(tfCols$hasPeak)),
+    .funs = ~replace_na(data = ., replace = FALSE)
+  )
 
 # glimpse(expressionData)
 
@@ -235,34 +239,34 @@ ylimList <- list()
 hasPeakDf <- filter_at(
   .tbl = expressionData,
   .vars = unname(tfCols$hasPeak),
-  .vars_predicate = any_vars(. == "TRUE")
-)
+  .vars_predicate = all_vars(. == "TRUE")
+) %>% 
+  dplyr::mutate(group = "peaks")
 
-## plot genes which has TF peak in a specific TF sample
-hasPeakDf2 <- filter_at(
+nGenes <- nrow(hasPeakDf)
+
+## genes which do not have peak and no polII signal
+noPeakPolIIDf <-dplyr::filter_at(
   .tbl = expressionData,
-  .vars = unname(tfCols$hasPeak[1]),
-  .vars_predicate = any_vars(. == "TRUE")
-)
+  .vars = unname(c(tfCols$hasPeak, polIICols$is_expressed)),
+  .vars_predicate = all_vars(. == FALSE)
+) %>% 
+  dplyr::slice_min(
+    order_by = !!sym(unname(polIICols$exp)), n = nGenes, with_ties = FALSE
+  ) %>%
+  # dplyr::slice_sample(n = nGenes) %>% 
+  dplyr::mutate(group = "control")
 
-# glimpse(hasPeakDf2)
-
-# ggplot2::ggplot(
-#   data = hasPeakDf2,
-#   mapping = aes(
-#     x = rank(peakPval.An_kdmB_48h_HA_1),
-#     y = rank(An_untagged_48h_polII_1)
-#   )
-# ) +
-#   geom_point()
-
+plotData <- dplyr::bind_rows(hasPeakDf, noPeakPolIIDf) %>% 
+  dplyr::mutate(
+    group = forcats::fct_relevel(.f = group, "peaks", "control")
+  )
 
 regionProfiles_peak <- multi_profile_plots(
   exptInfo = regionProfileData,
-  genesToPlot = hasPeakDf$geneId,
+  genesToPlot = plotData$geneId,
   matSource = regionMatType,
   matBins = regionMatDim,
-  # clusters = hasPeakDf,
   drawClusterAn = FALSE,
   profileColors = colorList,
   expressionColor = NULL,
@@ -273,13 +277,13 @@ regionProfiles_peak <- multi_profile_plots(
 
 tssProfiles_peak <- multi_profile_plots(
   exptInfo = tssProfileData,
-  genesToPlot = hasPeakDf$geneId,
+  genesToPlot = plotData$geneId,
   targetType = "point",
   targetName = "ATG",
   matSource = tssMatType,
   matBins = tssMatDim,
-  # clusters = hasPeakDf,
-  # drawClusterAn = TRUE,
+  clusters = dplyr::select(plotData, geneId, cluster = group),
+  drawClusterAn = TRUE,
   profileColors = colorList,
   column_title_gp = gpar(fontsize = 12),
   ylimFraction = ylimList
@@ -289,7 +293,7 @@ tssProfiles_peak <- multi_profile_plots(
 
 ## gene length annotation
 anGl_peaks <- gene_length_heatmap_annotation(
-  bedFile = file_genes, genes = hasPeakDf$geneId,
+  bedFile = file_genes, genes = plotData$geneId,
   # pointSize = unit(4, "mm"),
   axis_param = list(at = c(2000, 4000), labels = c("2kb", "> 4kb"))
 )
@@ -300,9 +304,9 @@ peaks_htlist <- peaks_htlist + tssProfiles_peak$heatmapList
 peaks_htlist <- peaks_htlist + regionProfiles_peak$heatmapList
 
 ## make sure that the order of genes in the heatmap list and in the dataframe is same
-if(all(rownames(peaks_htlist@ht_list[[ tfData$profileName[1] ]]@matrix) == hasPeakDf$geneId)){
+if(all(rownames(peaks_htlist@ht_list[[ tfData$profileName[1] ]]@matrix) == plotData$geneId)){
   
-  rowOrd_peaks <- order(hasPeakDf[[ tfCols$peakDist[[1]] ]], decreasing = TRUE)
+  rowOrd_peaks <- order(plotData[[ tfCols$peakDist[[1]] ]], decreasing = TRUE)
   
 }
 
@@ -326,7 +330,7 @@ draw(
   heatmap_legend_side = "bottom",
   gap = unit(7, "mm"),
   # row_order = rowOrd_peaks,
-  split = rep(1, nrow(hasPeakDf)),
+  # split = rep(1, nrow(plotData)),
   padding = unit(rep(0.5, times = 4), "cm")
 )
 
@@ -353,7 +357,7 @@ dev.off()
 #      row_sub_title_side = "left",
 #      heatmap_legend_side = "bottom",
 #      gap = unit(7, "mm"),
-#      split = rep(1, nrow(hasPeakDf)),
+#      split = rep(1, nrow(poltData)),
 #      # row_order = rowOrd_peaks,
 #      padding = unit(rep(0.5, times = 4), "cm")
 # )

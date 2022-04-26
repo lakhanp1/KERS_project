@@ -1015,9 +1015,9 @@
       "RemoteHost": "api.github.com",
       "RemoteRepo": "chipmine",
       "RemoteUsername": "lakhanp1",
-      "RemoteRef": "1.6.0",
-      "RemoteSha": "3b4a5c2e3cc7d34b03b1b2a603242d579d9a13f7",
-      "Hash": "c711add251b09d62f0483fbe5142ff88",
+      "RemoteRef": "KERS_paper",
+      "RemoteSha": "de50bac02074b9b1a5d8fbca887ee8d1adeadcd1",
+      "Hash": "45a29637c393b35a7a1662acbe4aa8be",
       "Requirements": [
         "ComplexHeatmap",
         "EnrichedHeatmap",
@@ -3131,6 +3131,14 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "e25793551cbdb843154152e5ee88cbd6",
+      "Requirements": []
+    },
+    "sm": {
+      "Package": "sm",
+      "Version": "2.2-5.7",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "42ac7f93c02aaf21aa531083671ea850",
       "Requirements": []
     },
     "snow": {
