@@ -3,15 +3,14 @@ suppressPackageStartupMessages(library(here))
 suppressPackageStartupMessages(library(summarytools))
 suppressPackageStartupMessages(library(org.Anidulans.FGSCA4.eg.db))
 
-## generate profile plots for kdmB complex members
+## generate profile plots for KERS complex
 ## group the genes into different categories based on kdmB complex member binding status
 ## plot the profile plots for groups
 ## plot average signal for the groups
 
 rm(list = ls())
 
-source(file = "E:/Chris_UM/GitHub/omics_util/04_GO_enrichment/s01_topGO_functions.R")
-
+source("D:/work_lakhan/github/omics_utils/04_GO_enrichment/s01_enrichment_functions.R")
 ##################################################################################
 
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
@@ -77,10 +76,13 @@ glimpse(geneInfo)
 ##################################################################################
 
 ## read the experiment sample details and select only those which are to be plotted
-tempSInfo <- get_sample_information(exptInfoFile = file_exptInfo,
-                                    samples = sampleList$sampleId,
-                                    dataPath = TF_dataPath,
-                                    profileMatrixSuffix = matrixType)
+tempSInfo <- get_sample_information(
+  exptInfoFile = file_exptInfo,
+  samples = sampleList$sampleId,
+  dataPath = TF_dataPath,
+  profileMatrixSuffix = matrixType
+)
+
 
 polII_ids <- tempSInfo$sampleId[which(tempSInfo$IP_tag == "polII")]
 tfIds <- tempSInfo$sampleId[which(tempSInfo$IP_tag %in% c("HA", "MYC", "TAP") & tempSInfo$TF != "untagged")]
@@ -89,26 +91,26 @@ histIds <- tempSInfo$sampleId[which(tempSInfo$IP_tag == "HIST")]
 
 
 ## read the experiment sample details and select only those which are to be plotted
-tfData <- get_sample_information(exptInfoFile = file_exptInfo,
-                                 samples = tfIds,
-                                 dataPath = TF_dataPath,
-                                 profileMatrixSuffix = matrixType)
+tfData <- get_sample_information(
+  exptInfoFile = file_exptInfo, samples = tfIds,
+  dataPath = TF_dataPath, profileMatrixSuffix = matrixType
+)
 
 
-inputData <- get_sample_information(exptInfoFile = file_exptInfo,
-                                    samples = inputIds,
-                                    dataPath = TF_dataPath,
-                                    profileMatrixSuffix = matrixType)
+inputData <- get_sample_information(
+  exptInfoFile = file_exptInfo, samples = inputIds,
+  dataPath = TF_dataPath, profileMatrixSuffix = matrixType
+)
 
-polIIData <- get_sample_information(exptInfoFile = file_exptInfo,
-                                    samples = polII_ids,
-                                    dataPath = polII_dataPath,
-                                    profileMatrixSuffix = matrixType)
+polIIData <- get_sample_information(
+  exptInfoFile = file_exptInfo, samples = polII_ids,
+  dataPath = polII_dataPath, profileMatrixSuffix = matrixType
+)
 
-histData <- get_sample_information(exptInfoFile = file_exptInfo,
-                                   samples = histIds,
-                                   dataPath = hist_dataPath,
-                                   profileMatrixSuffix = matrixType)
+histData <- get_sample_information(
+  exptInfoFile = file_exptInfo, samples = histIds,
+  dataPath = hist_dataPath, profileMatrixSuffix = matrixType
+)
 
 exptData <- dplyr::bind_rows(tfData, inputData, histData, polIIData)
 
@@ -130,9 +132,10 @@ tfCols <- sapply(
 
 peakTargetMat <- peak_target_matrix(sampleInfo = tfData, position = "best")
 
-peakTargetMat <- dplyr::mutate_at(.tbl = peakTargetMat,
-                                  .vars = vars(starts_with("hasPeak.")),
-                                  .funs = ~ factor(., levels = c(TRUE, FALSE))
+peakTargetMat <- dplyr::mutate_at(
+  .tbl = peakTargetMat,
+  .vars = vars(starts_with("hasPeak.")),
+  .funs = ~ factor(., levels = c(TRUE, FALSE))
 )
 
 expressionData <- get_polII_expressions(exptInfo = exptData,
@@ -151,6 +154,14 @@ dplyr::group_by_at(hasPeakDf, .vars = vars(starts_with("hasPeak."))) %>%
 
 readr::write_tsv(x = hasPeakDf, file = paste(outPrefix, ".peaks_data.tab", sep = ""))
 
+dplyr::filter_at(
+  hasPeakDf, .vars = vars(starts_with("hasPeak.")), .vars_predicate = all_vars(. == TRUE)
+) %>% 
+  dplyr::select(geneId) %>% 
+  readr::write_tsv(
+    file = paste(outPrefix, ".common_genes.tab")
+  )
+
 ## group label data mean profile facet plot
 groupLabelDf <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
   dplyr::summarise(n = n()) %>% 
@@ -167,38 +178,31 @@ readr::write_tsv(x = bindingMat, file = paste(outPrefix, ".binding_matrix.tab", 
 ##################################################################################
 ## topGO enrichment
 goEnrich <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
-  do(topGO_enrichment(goMapFile = file_topGoMap, genes = .$geneId, goNodeSize = 5))
+  do(
+    topGO_enrichment(
+      genes = .$geneId, orgdb = orgDb, inKeytype = "GID",
+      type = "BP", goNodeSize = 5, genenameKeytype = "GENE_NAME"
+    )
+  )
 
-readr::write_tsv(x = goEnrich, path = paste(outPrefix, ".peakGroups.topGO.tab", sep = ""))
+
+readr::write_tsv(x = goEnrich, file = paste(outPrefix, ".peakGroups.topGO.tab", sep = ""))
 
 
 ## pathway enrichment
 keggEnr <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
-  do(keggprofile_enrichment(genes = .$geneId, orgdb = orgDb, keytype = "GID",
-                            keggIdCol = "KEGG_ID", keggOrg = "ani", pvalCut = 0.05))
+  do(
+    tibble::as_tibble(
+      fgsea_kegg_overrepresentation(
+        genes = .$geneId, orgdb = orgDb, keggOrg = "ani", inKeytype = "GID",
+        keggKeytype = "KEGG_ID", genenameKeytype = "GENE_NAME", pvalueCutoff = 0.05
+      )
+    )
+  )
 
-readr::write_tsv(x = keggEnr, path = paste(outPrefix, ".peakGroups.KEGG_enrichment.tab", sep = ""))
 
+readr::write_tsv(x = keggEnr, file = paste(outPrefix, ".peakGroups.KEGG_enrichment.tab", sep = ""))
 
-# ## clusterProfiler groupGO assignment
-# grpGo <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
-#   do(clusterProfiler_groupGO(genes = .$geneId, org = orgDb, goLevel = 3, type = "BP", keyType ="GID"))
-# 
-# readr::write_tsv(x = grpGo, path = paste(outPrefix, ".peakGroups.GO_assignment.tab", sep = ""))
-# 
-# 
-# clusterProfile_ego <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
-#   dplyr::do(
-#     {
-#       ego <- clusterProfiler::enrichGO(
-#         gene = .$geneId, OrgDb = orgDb, keyType = "GID", ont = "BP"
-#       )
-#       as.data.frame(ego)
-#     }
-#   )
-# 
-# readr::write_tsv(x = clusterProfile_ego,
-#                  path = paste(outPrefix, ".peakGroups.clusterProfiler.tab", sep = ""))
 
 ##################################################################################
 
@@ -488,7 +492,59 @@ dev.off()
 
 
 ##################################################################################
+## upset plot
+cm = make_comb_mat(
+  dplyr::select(hasPeakDf, geneId, tfCols$hasPeak) %>% 
+    dplyr::filter_at(.vars = vars(!geneId), .vars_predicate = any_vars(. == TRUE))
+)
 
+ht_upset <- UpSet(
+  cm,
+  pt_size = unit(4, "mm"), lwd = 2,
+  set_order = tfData$sampleId,
+  row_labels = tfData$TF,
+  row_names_gp = gpar(fontsize = 14, fontface = "italic"),
+  column_title = "KERS bound genes statistics",
+  column_title_gp = gpar(fontsize = 20, fontface = "bold"),
+  # bg_col = stringr::str_replace(string = tfData$color, pattern = "white,", replacement = ""),
+  top_annotation = HeatmapAnnotation(
+    # "combSize" = anno_text(
+    #   x = paste("(", comb_size(cm), ")", sep = ""),
+    #   location = unit(0, "npc"), just = "left", rot = 90,
+    #   gp = gpar(fontface = "bold", color = "black")
+    # ),
+    "Intersection\nsize" = anno_barplot(
+      x = comb_size(cm), 
+      border = FALSE, 
+      gp = gpar(fill = "black"),
+      height = unit(4, "cm"),
+      axis = TRUE,
+      axis_param = list(at = c(0, 500, 1000, 1500, 2000)),
+      add_numbers = TRUE, numbers_rot = 90,
+      numbers_gp = gpar(fontface = "bold", color = "black")
+    ),
+    annotation_name_side = "left", 
+    annotation_name_rot = 0
+  ),
+  right_annotation = upset_right_annotation(
+    m = cm, 
+    gp = gpar(
+      fill = stringr::str_replace(string = tfData$color, pattern = "white,", replacement = "")
+    ),
+    annotation_name_side = "top",
+    axis_param = list(side = "top"),
+    axis = FALSE,
+    add_numbers = TRUE, numbers_rot = 0,
+    numbers_gp = gpar(fontface = "bold", color = "black")
+  ),
+  width = unit(12, "cm"), height = unit(3, "cm")
+)
+
+pdf(file = paste(outPrefix, ".peak_upset.pdf", sep = ""), width = 12, height = 8)
+ht_upset
+dev.off()
+
+##################################################################################
 statsDf <- dplyr::group_by_at(hasPeakDf, .vars = vars(starts_with("hasPeak."), "group")) %>% 
   dplyr::summarise(count = n_distinct(geneId)) %>% 
   dplyr::ungroup() %>% 
@@ -547,7 +603,7 @@ png(file = paste(outPrefix, ".peak_stats.png", sep = ""), width = 5000, height =
 pt_stats
 dev.off()
 
-
+##################################################################################
 
 
 
