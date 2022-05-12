@@ -33,8 +33,6 @@ showExpressionHeatmap <- FALSE
 file_exptInfo <- here::here("data", "reference_data", "sampleInfo.txt")
 file_genes <- here::here("data", "reference_data", "AN_genesForPolII.bed")
 
-file_topGoMap <- "E:/Chris_UM/Database/A_Nidulans/ANidulans_OrgDb/geneid2go.ANidulans.topGO.map"
-
 TF_dataPath <- here::here("..", "data", "A_nidulans", "TF_data")
 polII_dataPath <- here::here("..", "data", "A_nidulans", "polII_data")
 hist_dataPath <- here::here("..", "data", "A_nidulans", "histone_data")
@@ -138,14 +136,6 @@ expressionData <- get_TF_binding_data(exptInfo = tfData,
 
 peakTargetMat <- peak_target_matrix(sampleInfo = tfData, position = "best")
 
-
-anLables <- list()
-# anLables[[tssPeakTypeCol]] = gsub("peakType", "TSS peak type\n", tssPeakTypeCol) %>% gsub("\\(|\\)", "", .)
-# anLables[[tesPeakTypeCol]] = gsub("tesPeakType", "TES peak type\n", tesPeakTypeCol) %>% gsub("\\(|\\)", "", .)
-# anLables[[isExpCol]] = txt = gsub("is_expressed", "is expressed\n", isExpCol) %>% gsub("\\(|\\)", "", .)
-anLables[["is_SM_gene"]] = "SM gene"
-anLables[["is_TF"]] = "Transcription Factor"
-anLables[["gene_length"]] = "Gene Length"
 
 ##################################################################################
 

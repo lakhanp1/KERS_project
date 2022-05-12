@@ -14,9 +14,12 @@ rm(list = ls())
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
 comparisonName <- "R_H3KAc_48h"
 outDir <- here::here("analysis", "10_KERS_histone", comparisonName)
+
+file_commonGenes <- file.path(outDir, "KERS_complex_48h.common_genes.tab")
+file_plotSamples <- file.path(outDir, "samples.txt")
+
 outPrefix <- file.path(outDir, comparisonName)
 
-file_plotSamples <- file.path(outDir, "samples.txt")
 
 # "deeptools", "miao", "normalizedmatrix", "normalizedmatrix_5kb"
 regionMatType <- "deeptools"
@@ -45,11 +48,6 @@ txDb <- TxDb.Anidulans.FGSCA4.AspGD.GFF
 ## colors
 colList <- list()
 
-outPrefix_all <- paste(outPrefix, "_allGenes", sep = "")
-outPrefix_expressed <- paste(outPrefix, "_expressedGenes", sep = "")
-outPrefix_sm <- paste(outPrefix, "_SM_genes", sep = "")
-outPrefix_peaks <- paste(outPrefix, "_peaksGenes", sep = "")
-outPrefix_pkExp <- paste(outPrefix, "_pkExpGenes", sep = "")
 
 ##################################################################################
 sampleList <- suppressMessages(readr::read_tsv(file = file_plotSamples, comment = "#"))
@@ -116,18 +114,25 @@ tfCols <- sapply(
 ##################################################################################
 
 ## genes to read
-geneSet <- data.table::fread(file = file_genes, header = F,
-                             col.names = c("chr", "start", "end", "geneId", "score", "strand"))
-
-kmClust <- dplyr::left_join(
-  x = suppressMessages(readr::read_tsv(file = tfData$clusterFile[1])),
-  y = geneSet, by = c("geneId" = "geneId")
+geneSet <- data.table::fread(
+  file = file_genes, header = F,
+  col.names = c("chr", "start", "end", "geneId", "score", "strand")
 )
+
+kersGenes <- suppressMessages(readr::read_tsv(file = file_commonGenes)) %>% 
+  dplyr::mutate(binding = "KERS")
+
+# kmClust <- dplyr::left_join(
+#   x = suppressMessages(readr::read_tsv(file = tfData$clusterFile[1])),
+#   y = geneSet, by = c("geneId" = "geneId")
+# )
 
 geneDesc <- AnnotationDbi::select(x = orgDb, keys = geneSet$gene, keytype = "GID",
                                   columns = c("GENE_NAME", "DESCRIPTION"))
 
-geneInfo <- dplyr::left_join(x = kmClust, y = geneDesc, by = c("geneId" = "GID"))
+geneInfo <- dplyr::left_join(x = geneSet, y = geneDesc, by = c("geneId" = "GID")) %>% 
+  dplyr::left_join(y = kersGenes, by = "geneId") %>% 
+  tidyr::replace_na(replace = list(binding = "not_KERS"))
 
 glimpse(geneInfo)
 
@@ -145,14 +150,6 @@ expressionData <- get_polII_expressions(
 
 # glimpse(expressionData)
 
-
-anLables <- list()
-# anLables[[tssPeakTypeCol]] = gsub("peakType", "TSS peak type\n", tssPeakTypeCol) %>% gsub("\\(|\\)", "", .)
-# anLables[[tesPeakTypeCol]] = gsub("tesPeakType", "TES peak type\n", tesPeakTypeCol) %>% gsub("\\(|\\)", "", .)
-# anLables[[isExpCol]] = txt = gsub("is_expressed", "is expressed\n", isExpCol) %>% gsub("\\(|\\)", "", .)
-anLables[["is_SM_gene"]] = "SM gene"
-anLables[["is_TF"]] = "Transcription Factor"
-anLables[["gene_length"]] = "Gene Length"
 
 ##################################################################################
 ## color list
@@ -180,6 +177,7 @@ matList <- c(regionMatList, tssMatList)
 
 ## tf colors
 tfMeanProfile <- NULL
+tfColorList <- NULL
 if(length(c(tfIds)) == 1){
   tfMeanProfile <- matList[[tfIds]]
 } else{
@@ -236,14 +234,11 @@ ylimList <- list()
 
 ##################################################################################
 # plot genes which has TF peak in any of the TF samples
-hasPeakDf <- filter_at(
-  .tbl = expressionData,
-  .vars = unname(tfCols$hasPeak),
-  .vars_predicate = all_vars(. == "TRUE")
-) %>% 
-  dplyr::mutate(group = "peaks")
+commonPeaks <- dplyr::filter(
+  .data = expressionData, binding == "KERS"
+)
 
-nGenes <- nrow(hasPeakDf)
+nGenes <- nrow(commonPeaks)
 
 ## genes which do not have peak and no polII signal
 noPeakPolIIDf <-dplyr::filter_at(
@@ -251,15 +246,14 @@ noPeakPolIIDf <-dplyr::filter_at(
   .vars = unname(c(tfCols$hasPeak, polIICols$is_expressed)),
   .vars_predicate = all_vars(. == FALSE)
 ) %>% 
+  dplyr::filter(binding == "not_KERS") %>% 
   dplyr::slice_min(
     order_by = !!sym(unname(polIICols$exp)), n = nGenes, with_ties = FALSE
-  ) %>%
-  # dplyr::slice_sample(n = nGenes) %>% 
-  dplyr::mutate(group = "control")
+  )
 
-plotData <- dplyr::bind_rows(hasPeakDf, noPeakPolIIDf) %>% 
+plotData <- dplyr::bind_rows(commonPeaks, noPeakPolIIDf) %>% 
   dplyr::mutate(
-    group = forcats::fct_relevel(.f = group, "peaks", "control")
+    binding = forcats::fct_relevel(.f = binding, "KERS", "not_KERS")
   )
 
 regionProfiles_peak <- multi_profile_plots(
@@ -282,7 +276,7 @@ tssProfiles_peak <- multi_profile_plots(
   targetName = "ATG",
   matSource = tssMatType,
   matBins = tssMatDim,
-  clusters = dplyr::select(plotData, geneId, cluster = group),
+  clusters = dplyr::select(plotData, geneId, cluster = binding),
   drawClusterAn = TRUE,
   profileColors = colorList,
   column_title_gp = gpar(fontsize = 12),
@@ -315,10 +309,10 @@ pdfWd <- 2 +
   (length(polII_ids) * 0.25 * showExpressionHeatmap)
 
 # wd <- 500 + (nrow(exptData) * 700) + (length(polII_ids) * 500 * showExpressionHeatmap)
-title_peak= paste(comparisonName, ": genes with binding signal (macs2 peak targets)", collapse = "")
+title_peak= paste(comparisonName, ": KERS target genes (n = ", nGenes, ")", sep = "")
 
 
-pdf(file = paste(outPrefix_peaks, ".profiles.pdf", sep = ""), width = pdfWd, height = 13)
+pdf(file = paste(outPrefix, ".common_peaks.profiles.pdf", sep = ""), width = pdfWd, height = 13)
 
 draw(
   peaks_htlist,
@@ -338,138 +332,12 @@ draw(
 dev.off()
 
 
-## draw ungrouped profile Heatmap and add the annotation name decoration
-# 
-# peaks_htlist2 <- anGl_peaks$an
-# i <- 1
-# for(i in 1:nrow(exptData)){
-#   peaks_htlist2 <- peaks_htlist2 + multiProfiles_peak$profileHeatmaps[[exptData$sampleId[i]]]$heatmap
-# }
-# 
-# 
-# pdf(file = paste(outPrefix_peaks, "_profiles_ungrouped.pdf", sep = ""), width = pdfWd, height = 13)
-# 
-# draw(peaks_htlist2,
-#      main_heatmap = exptData$profileName[1],
-#      # annotation_legend_list = list(profile1$legend),
-#      column_title = title_peak,
-#      column_title_gp = gpar(fontsize = 14, fontface = "bold"),
-#      row_sub_title_side = "left",
-#      heatmap_legend_side = "bottom",
-#      gap = unit(7, "mm"),
-#      split = rep(1, nrow(poltData)),
-#      # row_order = rowOrd_peaks,
-#      padding = unit(rep(0.5, times = 4), "cm")
-# )
-# 
-# dev.off()
 
 
-# ##################################################################################
-# ## plot polII expressed and TF bound genes together
-# 
-# ## select the genes which are expressed in polII sample OR have TSS peak
-# peakExpDf <- filter_at(.tbl = expressionData,
-#                        .vars = unname(c(tfCols$hasPeak, polIICols$is_expressed)),
-#                        .vars_predicate = any_vars(. == "TRUE"))
-# 
-# dplyr::group_by_at(peakExpDf, .vars = unname(c(tfCols$hasPeak))) %>%
-#   dplyr::summarise(n= n())
-# 
-# # peakExpDf$group <- dplyr::group_by_at(peakExpDf, .vars = unname(c(tfCols$hasPeak, polIICols$is_expressed))) %>%
-# #   dplyr::group_indices()
-# # 
-# # newClusters <- dplyr::select(peakExpDf, gene, group) %>%
-# #   dplyr::rename(cluster = group)
-# 
-# multiProfiles_pkExp <- multi_profile_plots(
-#   exptInfo = exptData,
-#   expressionData = peakExpDf,
-#   genesToPlot = peakExpDf$geneId,
-#   matSource = matrixType,
-#   matBins = matrixDim,
-#   clusters = NULL,
-#   # clusterColor = multiProfiles_all$profileHeatmaps[[1]]$clusterColor,
-#   profileColors = colorList,
-#   expressionColor = multiProfiles_all$expressionColor,
-#   plotExpression = showExpressionHeatmap,
-#   ylimFraction = ylimList
-# )
-# 
-# 
-# ## heatmap of binary assignment of samples to different group
-# htMat <- dplyr::select(peakExpDf, gene, starts_with("hasPeak")) %>% 
-#   dplyr::mutate_if(.predicate = is.logical, .funs = as.character) %>% 
-#   as.data.frame() %>% 
-#   tibble::column_to_rownames("gene")
-# 
-# ## column name as annotation for Heatmap
-# colNameAnn <- HeatmapAnnotation(
-#   colName = anno_text(
-#     x = unname(tfCols$hasPeak),
-#     rot = 90, just = "left",
-#     offset = unit(1, "mm"),
-#     gp = gpar(fontsize = 10)
-#   )
-# )
-# 
-# grpHt_pkExp <- Heatmap(
-#   htMat,
-#   col = c("TRUE" = "black", "FALSE" = "white"),
-#   heatmap_legend_param = list(title = "Peak detected"),
-#   # column_names_side = "top",
-#   show_column_names = FALSE,
-#   top_annotation = colNameAnn,
-#   cluster_columns = FALSE, cluster_rows = FALSE,
-#   width = unit(3, "cm"),
-#   show_row_names = FALSE
-# )
-# 
-# ## gene length annotation
-# anGl_pkExp <- gene_length_heatmap_annotation(
-#   bedFile = file_genes, genes = peakExpDf$geneId,
-#   # pointSize = unit(4, "mm"),
-#   axis_param = list(at = c(2000, 4000), labels = c("2kb", "> 4kb"))
-# )
-# 
-# 
-# pkExp_htlist <- anGl_pkExp$an +
-#   multiProfiles_pkExp$heatmapList + grpHt_pkExp
-# 
-# 
-# ## row order as decreasing polII signal
-# if( all(rownames(pkExp_htlist@ht_list[[ polIIData$profileName[1] ]]@matrix) == peakExpDf$gene) ){
-#   ## polII signal order
-#   pkExpRowOrd <- order(peakExpDf[[polIICols$exp[1]]], decreasing = TRUE)
-#   
-#   ## hasPeak column order
-#   pkExpRowOrd <- order(peakExpDf[[ tfCols$hasPeak[1] ]],
-#                        peakExpDf[[ tfCols$hasPeak[2] ]],
-#                        peakExpDf[[ polIICols$exp[1] ]], decreasing = TRUE)
-#   
-# }
-# 
-# 
-# # wd <- 500 + (nrow(exptData) * 700) + (length(polII_ids) * 500 * showExpressionHeatmap)
-# title_pkExp <- paste(comparisonName, ": macs2 peak target genes and top 10% polII signal genes", collapse = "")
-# 
-# # png(filename = paste(outPrefix_pkExp, "_profiles.png", sep = ""), width=wd, height=3500, res = 270)
-# pdf(file = paste(outPrefix_pkExp, "_profiles.pdf", sep = ""), width = pdfWd, height = 13)
-# 
-# draw(pkExp_htlist,
-#      main_heatmap = exptData$profileName[1],
-#      # annotation_legend_list = list(profile1$legend),
-#      column_title = title_pkExp,
-#      column_title_gp = gpar(fontsize = 14, fontface = "bold"),
-#      row_sub_title_side = "left",
-#      heatmap_legend_side = "bottom",
-#      gap = unit(7, "mm"),
-#      row_order = pkExpRowOrd,
-#      padding = unit(rep(0.5, times = 4), "cm")
-# )
-# 
-# 
-# dev.off()
-# 
-# 
+##################################################################################
+
+
+
+
+
 

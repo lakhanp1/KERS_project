@@ -13,10 +13,10 @@ rm(list = ls())
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
 comparisonName <- "kdmB_polII_corr"
 
-tf_sample <- "An_kdmB_20h_HA_1"
+tf_sample <- "An_rpdA_20h_HA_1"
 polII_sample <- "An_untagged_20h_polII_1"
 
-outDir <- here::here("analysis", "11_KERS_polII_corr", comparisonName)
+outDir <- here::here("analysis", "11_KERS_polII_corr")
 outPrefix <- file.path(outDir, comparisonName)
 
 # "deeptools", "miao", "normalizedmatrix", "normalizedmatrix_5kb"
@@ -90,13 +90,19 @@ tssDown <- GenomicFeatures::promoters(x = genesGr, upstream = 0, downstream = 50
 
 
 expressionData <- get_TF_binding_data(
-  exptInfo = tfData, genesDf = geneSet
+  exptInfo = tfData, genesDf = geneSet, allColumns = TRUE
 )
 
 expressionData <- get_polII_expressions(
   exptInfo = polIIData, genesDf = expressionData
-)
+) %>% 
+  dplyr::mutate_at(
+    .vars = vars(unname(tfCols$hasPeak)),
+    .funs = ~replace_na(data = ., replace = FALSE)
+  )
 
+# glimpse(expressionData)
+##################################################################################
 
 bindingCov <- chipmine::region_coverage(regions = tssUp, bwFile = tfData$bwFile)
 polIICov <- chipmine::region_coverage(regions = tssDown, bwFile = polIIData$bwFile)
@@ -132,12 +138,42 @@ peakExpDf <- filter_at(
 )
 
 
+pt_scatter <- ggplot2::ggplot(
+  data = expressionData,
+  mapping = aes(x = log2(polII+1), y = log2(binding+1))
+) +
+  geom_point(alpha = 0.9, color = "black") +
+  # geom_bin2d(bins = 50) +
+  # geom_smooth(method=glm, se = FALSE, formula = y ~ x, color = "red") +
+  # geom_smooth(se = FALSE, color = "red") +
+  ggpubr::stat_cor(
+    mapping = aes(x = log2(polII+1), y = log2(binding+1)),
+    method = "spearman", size = 8, color = "red",
+    label.x.npc = "right", hjust = 1
+  ) +
+  labs(
+    title = "Scatter plot of binding at [-500, ATG] and polII-ChIPseq at [ATG, 500bp]",
+    subtitle = comparisonName
+  ) +
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    axis.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 14, face = "bold"),
+    plot.title = element_text(size = 14, face = "bold", hjust = 1),
+    plot.subtitle = element_text(size = 12, face = "bold"),
+  )
+
+ggsave(
+  filename = paste(outPrefix, ".scatter.pdf", sep = ""), plot = pt_scatter,
+  width = 7, height = 7
+)
+
 ggplot2::ggplot(
   data = expressionData,
-  mapping = aes(x = log2(polII+1), y = log2(binding+1),
-                color = peakPolII)
+  mapping = aes(x = log2(polII+1), y = log2(binding+1))
 ) +
-  geom_point() +
+  geom_point(mapping = aes(color = peakPolII), alpha = 0.4) +
   stat_summary_bin(
     fun = "mean", bins = 100, color='black', size=2, geom='point',
     orientation = "x"
@@ -145,8 +181,28 @@ ggplot2::ggplot(
   # geom_bin2d(bins = 50) +
   # geom_smooth(method=glm, se = FALSE, formula = y ~ x, color = "red") +
   # geom_smooth(se = FALSE, color = "red") +
-  # ggpubr::stat_cor(method = "spearman", size = 6) +
+  ggpubr::stat_cor(
+    mapping = aes(x = log2(polII+1), y = log2(binding+1)),
+    method = "spearman", size = 6
+  ) +
   theme_bw()
+
+
+
+
+
+sumPos <- readr::read_tsv(
+  file = paste(dirname(tfData$peakAnno), "/An_rpdA_20h_HA_1.withCtrl.narrowPeak.annotation.peakRegion.tab", sep = "")
+) %>% 
+  dplyr::select(peakId, geneId, relativeSummitPos) %>% 
+  dplyr::filter(!is.na(geneId))
+
+hasPeakDf2 <- dplyr::left_join(
+  x = hasPeakDf, y = sumPos, by = c("peakId.An_rpdA_20h_HA_1" = "peakId", "geneId")
+) %>% 
+  dplyr::filter(!is.na(relativeSummitPos))
+
+
 
 
 

@@ -63,21 +63,33 @@ txInfo <- suppressMessages(
 txInfo <- dplyr::filter(txInfo, !txType %in% c("tRNA", "rRNA", "snRNA", "snoRNA")) %>% 
   dplyr::filter(!grepl(pattern = "uORF", x = geneId))
 
-tfSampleList <- data.frame(
-  id = c("An_untagged_48h_input_1", "An_untagged_20h_HA_1", "An_untagged_20h_HA_2",
-         "An_untagged_48h_HA_1", "An_untagged_48h_HA_2", "An_untagged_20h_MYC_1",
-         "An_untagged_20h_MYC_2", "An_untagged_48h_MYC_1", "An_untagged_48h_MYC_2"),
-  stringsAsFactors = F)
+# tfSampleList <- data.frame(
+#   sampleId = c(
+#     "An_untagged_48h_input_1", "An_untagged_20h_HA_1", "An_untagged_20h_HA_2",
+#     "An_untagged_48h_HA_1", "An_untagged_48h_HA_2", "An_untagged_20h_MYC_1",
+#     "An_untagged_20h_MYC_2", "An_untagged_48h_MYC_1", "An_untagged_48h_MYC_2"
+#   )
+# )
+# 
+# tfSampleList <- data.frame(
+#   sampleId = c(
+#     "An_kdmB_20h_HA_1", "An_kdmB_laeA_del_20h_HA_2", "An_sudA_20h_HA_1",
+#     "An_rpdA_20h_HA_1", "An_sntB_20h_HA_1", "An_ecoA_20h_HA_1", "An_kdmB_48h_HA_1",
+#     "An_rpdA_48h_HA_1", "An_sntB_48h_HA_1", "An_sudA_48h_HA_1", "An_ecoA_48h_HA_1"
+#   )
+# )
 
-tfSampleList <- data.frame(
-  id = c("An_kdmB_20h_HA_1", "An_kdmB_laeA_del_20h_HA_2", "An_sudA_20h_HA_1",
-         "An_rpdA_20h_HA_1", "An_sntB_20h_HA_1", "An_ecoA_20h_HA_1", "An_kdmB_48h_HA_1",
-         "An_rpdA_48h_HA_1", "An_sntB_48h_HA_1", "An_sudA_48h_HA_1", "An_ecoA_48h_HA_1"),
-  stringsAsFactors = F)
+tfSampleList <- tibble::tibble(
+  sampleId = c(
+    "veA_wt_Rpb1_15h_mix22_1", "veA_wt_Rpb1_15h_mix22_2", "veA_wt_Rpb3_15h_mix22_1",
+    "veA_wt_Rpb3_15h_mix22_2", "veA_wt_TBP_15h_mix22_1", "veA_wt_TBP_15h_mix22_2",
+    "veA_wt_TFIIB_15h_mix22_1", "veA_wt_TFIIB_15h_mix22_2"
+  )
+)
 
 tfInfo <- get_sample_information(
   exptInfoFile = file_exptInfo,
-  samples = tfSampleList$id,
+  samples = tfSampleList$sampleId,
   dataPath = TF_dataPath,
   profileMatrixSuffix = matrixType)
 
@@ -110,33 +122,19 @@ for(i in 1:nrow(tfInfo)){
     output = tfInfo$peakAnno[i],
     removePseudo = TRUE)
   
-  ## based on the updated package markPeaks
-  # peakAn <- markPeaks::annotate_peaks(
-  #   peakFile = tfInfo$peakFile[i],
-  #   txdb = txDb,
-  #   txIds = txInfo$TXID,
-  #   summitRegion = 1,
-  #   fileFormat = peakType,
-  #   promoterLength = 700,
-  #   upstreamLimit = 1500,
-  #   bidirectionalDistance = 500,
-  #   includeFractionCut = 0.7,
-  #   bindingInGene = FALSE,
-  #   insideSkewToEndCut = 0.7,
-  #   removePseudo = TRUE,
-  #   output = tfInfo$peakAnno[i]
-  # )
   
-  # if( !is.null(peakAn) ){
-  #   tfDf <- gene_level_peak_annotation(
-  #     sampleId = tfInfo$sampleId[i],
-  #     peakAnnotation = tfInfo$peakAnno[i],
-  #     genesDf = geneSet,
-  #     peakFile = tfInfo$peakFile[i],
-  #     bwFile = tfInfo$bwFile[i],
-  #     outFile = tfInfo$peakTargetFile[i])
-  # }
-
+  if( !is.null(peakAn) ){
+    tfDf <- gene_level_peak_annotation(
+      sampleId = tfInfo$sampleId[i],
+      peakAnnotation = tfInfo$peakAnno[i],
+      genesDf = geneSet,
+      peakFile = tfInfo$peakFile[i],
+      bwFile = tfInfo$bwFile[i],
+      outFile = tfInfo$peakTargetFile[i],
+      pvalCutoff = tfInfo$cutoff_pval[i]
+      )
+  }
+  
 }
 
 
