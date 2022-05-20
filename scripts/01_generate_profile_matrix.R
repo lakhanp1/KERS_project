@@ -10,7 +10,7 @@ suppressPackageStartupMessages(library(here))
 
 rm(list = ls())
 
-cl <- makeCluster(4) #not to overload your computer
+cl <- makeCluster(2) #not to overload your computer
 registerDoParallel(cl)
 
 ##################################################################################
@@ -49,14 +49,15 @@ matrixDim = c(c(up, body, down)/bin, bin)
 ##################################################################################
 sampleList <- tibble::tibble(
   sampleId = c(
-    # "An_kdmB_20h_HA_1", "An_sntB_20h_HA_1", "An_H3_20h_HIST_1", "An_H3K4Me3_20h_HIST_1",
-    # "An_H3K9Ac_20h_HIST_1", "An_H3K9Me3_20h_HIST_1", "An_H3K36Me3_20h_HIST_1", "An_H3_48h_HIST_1", 
-    # "An_H3K9Ac_48h_HIST_1", "An_rpdA_20h_HA_1", "An_sntB_48h_HA_1",  "An_kdmB_48h_HA_1",
-    # "An_H3K36Me3_48h_HIST_1", "An_H3K4Me3_48h_HIST_1", "An_H3K9Me3_48h_HIST_1",
-    # "An_ecoA_20h_HA_1", "An_ecoA_20h_HA_2", "An_ecoA_48h_HA_1", "An_ecoA_48h_HA_2
-    # An_kdmB_20h_HA_2", "An_kdmB_48h_HA_2", "An_rpdA_20h_HA_2", "An_rpdA_48h_HA_1",
-    # "An_rpdA_48h_HA_2", "An_sntB_20h_HA_2", "An_sntB_48h_HA_2", "An_untagged_20h_HA_1",
-    # "An_untagged_20h_HA_2", "An_untagged_48h_HA_1", "An_untagged_48h_HA_2",
+    # "An_kdmB_20h_HA_1", "An_kdmB_20h_HA_2", "An_kdmB_48h_HA_1", "An_kdmB_48h_HA_2",
+    # "An_sntB_20h_HA_1", "An_sntB_20h_HA_2", "An_sntB_48h_HA_1", "An_sntB_48h_HA_2",
+    # "An_ecoA_20h_HA_1", "An_ecoA_20h_HA_2", "An_ecoA_48h_HA_1", "An_ecoA_48h_HA_2",
+    # "An_rpdA_20h_HA_2", "An_rpdA_48h_HA_1", "An_rpdA_20h_HA_1", "An_rpdA_48h_HA_2",
+    "An_H3_20h_HIST_1", "An_H3K4Me3_20h_HIST_1",
+    "An_H3K9Ac_20h_HIST_1", "An_H3K9Me3_20h_HIST_1", "An_H3K36Me3_20h_HIST_1",
+    "An_H3K9Ac_48h_HIST_1", "An_H3_48h_HIST_1",
+    "An_H3K36Me3_48h_HIST_1", "An_H3K4Me3_48h_HIST_1", "An_H3K9Me3_48h_HIST_1",
+    # "An_untagged_20h_HA_1", "An_untagged_20h_HA_2", "An_untagged_48h_HA_1", "An_untagged_48h_HA_2",
     "H3_ANM_NH4_CW360_411", "H3_NH4_CW466_525", "H3K27ac_NH4_CW466_525", 
     "H3K27ac_ANM_NH4_CW360_411", "H3K4me3_NH4_CW466_525", "H3K4me3_ANM_NH4_CW360_411",
     "H3K9ac_NH4_CW466_525", "H3K9ac_ANM_NH4_CW360_411", "H3ac_NH4_CW466_525",
@@ -150,13 +151,13 @@ foreach::foreach(
   #   target_ratio = 0.25
   # )
   
-  ## -3kb - ATG - 3kb
-  matTss <- gsub(pattern = ".tab.gz", replacement = "_3kbATG3kb.tab.gz", x = exptData$matFile[rowId])
+  ## -2kb - ATG - 2kb
+  matTss <- gsub(pattern = ".tab.gz", replacement = "_2kbATG2kb.tab.gz", x = exptData$matFile[rowId])
   bwMat <- chipmine::bigwig_profile_matrix(
     bwFile = exptData$bwFile[rowId],
     regions = tssGr,
     signalName = exptData$sampleId[rowId],
-    extend = c(3000, 3000),
+    extend = c(2000, 2000),
     storeLocal = TRUE,
     localPath = matTss,
     targetName = "tss"

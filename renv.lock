@@ -1016,8 +1016,8 @@
       "RemoteRepo": "chipmine",
       "RemoteUsername": "lakhanp1",
       "RemoteRef": "KERS_paper",
-      "RemoteSha": "de50bac02074b9b1a5d8fbca887ee8d1adeadcd1",
-      "Hash": "45a29637c393b35a7a1662acbe4aa8be",
+      "RemoteSha": "df2fd5d8cbd4750b0ad7d7f419c29f4089bc0852",
+      "Hash": "d24ed85e42fc479515cfdbec19c1ed86",
       "Requirements": [
         "ComplexHeatmap",
         "EnrichedHeatmap",
@@ -3131,14 +3131,6 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "e25793551cbdb843154152e5ee88cbd6",
-      "Requirements": []
-    },
-    "sm": {
-      "Package": "sm",
-      "Version": "2.2-5.7",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "42ac7f93c02aaf21aa531083671ea850",
       "Requirements": []
     },
     "snow": {
