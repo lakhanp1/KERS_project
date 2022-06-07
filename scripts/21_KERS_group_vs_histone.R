@@ -2,21 +2,26 @@ suppressPackageStartupMessages(library(chipmine))
 suppressPackageStartupMessages(library(here))
 suppressPackageStartupMessages(library(org.Anidulans.FGSCA4.eg.db))
 suppressPackageStartupMessages(library(TxDb.Anidulans.FGSCA4.AspGD.GFF))
+suppressPackageStartupMessages(library(ggbeeswarm))
+suppressPackageStartupMessages(library(ggforce))
+suppressPackageStartupMessages(library(ggdist))
+suppressPackageStartupMessages(library(gghalves))
+suppressPackageStartupMessages(library(ggpubr))
 
 
-## This script plots the profile heatmaps for multiple samples. If the expression values are present, it
-## also plots a simple heatmap using these expression values
+## compare Histone signal in different KERS binding group combinations
 
 rm(list = ls())
 
 ##################################################################################
 
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
-comparisonName <- "R_H3KAc_20h"
+comparisonName <- "KERS_groups_vs_H3KAc_20h"
 outDir <- here::here("analysis", "10_KERS_histone", comparisonName)
 
-file_geneSet <- file.path(outDir, "KERS_complex_20h.common_genes.tab")
 file_plotSamples <- file.path(outDir, "samples.txt")
+file_kersBinding <- here::here("analysis", "03_KERS_complex", "KERS_complex_20h",
+                               "KERS_complex_20h.peaks_data.tab")
 
 outPrefix <- file.path(outDir, comparisonName)
 
@@ -119,8 +124,7 @@ geneSet <- data.table::fread(
   col.names = c("chr", "start", "end", "geneId", "score", "strand")
 )
 
-kersGenes <- suppressMessages(readr::read_tsv(file = file_geneSet)) %>% 
-  dplyr::mutate(binding = "KERS")
+kersGenes <- suppressMessages(readr::read_tsv(file = file_kersBinding))
 
 # kmClust <- dplyr::left_join(
 #   x = suppressMessages(readr::read_tsv(file = tfData$clusterFile[1])),
@@ -132,23 +136,15 @@ geneDesc <- AnnotationDbi::select(x = orgDb, keys = geneSet$gene, keytype = "GID
 
 geneInfo <- dplyr::left_join(x = geneSet, y = geneDesc, by = c("geneId" = "GID")) %>% 
   dplyr::left_join(y = kersGenes, by = "geneId") %>% 
-  tidyr::replace_na(replace = list(binding = "not_KERS"))
+  tidyr::replace_na(replace = list(bindingGroup = "!!!!"))
 
 glimpse(geneInfo)
 
-expressionData <- get_TF_binding_data(
-  exptInfo = tfData, genesDf = geneInfo
-)
+expressionData <- geneInfo
 
-expressionData <- get_polII_expressions(
-  exptInfo = polIIData, genesDf = expressionData
-) %>% 
-  dplyr::mutate_at(
-    .vars = vars(unname(tfCols$hasPeak)),
-    .funs = ~replace_na(data = ., replace = FALSE)
-  )
-
-# glimpse(expressionData)
+genesGr <- rtracklayer::import.bed(con = file_genes)
+tssUp <- GenomicFeatures::promoters(x = genesGr, upstream = 500, downstream = 0)
+tssDown <- GenomicFeatures::promoters(x = genesGr, upstream = 0, downstream = 500)
 
 
 ##################################################################################
@@ -156,13 +152,13 @@ expressionData <- get_polII_expressions(
 tssMatList <- NULL
 regionMatList <- NULL
 
-regionMatList <- import_profiles(
-  exptInfo = regionProfileData,
-  geneList = expressionData$geneId,
-  source = regionMatType,
-  up = regionMatDim[1], target = regionMatDim[2], down = regionMatDim[3],
-  targetType = "region", targetName = "gene"
-)
+# regionMatList <- import_profiles(
+#   exptInfo = regionProfileData,
+#   geneList = expressionData$geneId,
+#   source = regionMatType,
+#   up = regionMatDim[1], target = regionMatDim[2], down = regionMatDim[3],
+#   targetType = "region", targetName = "gene"
+# )
 
 tssMatList <- import_profiles(
   exptInfo = tssProfileData,
@@ -235,42 +231,86 @@ ylimList <- list()
 # ylimList <- append(x = ylimList,
 #                    values = sapply(c(tfIds, inputIds), function(x){return(c(0, 25))}, simplify = FALSE))
 
+
 ##################################################################################
-# plot genes which has TF peak in any of the TF samples
-commonPeaks <- dplyr::filter(
-  .data = expressionData, binding == "KERS"
-)
-
-nGenes <- nrow(commonPeaks)
-
-## genes which do not have peak and no polII signal
-noPeakPolIIDf <-dplyr::filter_at(
-  .tbl = expressionData,
-  .vars = unname(c(tfCols$hasPeak, polIICols$is_expressed)),
-  .vars_predicate = all_vars(. == FALSE)
+## histone coverage comparison plot
+coverageDf <- chipmine::region_coverage_matrix(
+  regions = tssDown, exptInfo = exptData
 ) %>% 
-  dplyr::filter(binding == "not_KERS") %>% 
-  dplyr::slice_min(
-    order_by = !!sym(unname(polIICols$exp)), n = nGenes, with_ties = FALSE
-  )
+  dplyr::select(-score)
 
-plotData <- dplyr::bind_rows(commonPeaks, noPeakPolIIDf) %>% 
-  dplyr::mutate(
-    binding = forcats::fct_relevel(.f = binding, "KERS", "not_KERS")
-  )
 
-regionProfiles_peak <- multi_profile_plots(
-  exptInfo = regionProfileData,
-  genesToPlot = plotData$geneId,
-  matSource = regionMatType,
-  matBins = regionMatDim,
-  drawClusterAn = FALSE,
-  profileColors = colorList,
-  expressionColor = NULL,
-  plotExpression = showExpressionHeatmap,
-  column_title_gp = gpar(fontsize = 12),
-  ylimFraction = ylimList
+expressionData <- dplyr::left_join(
+  x = expressionData, y = coverageDf, by = c("geneId" = "name")
 )
+
+
+plotData <- dplyr::filter(
+  expressionData, bindingGroup %in% c("KERS", "!!RS")
+) %>% 
+  dplyr::mutate(
+    bindingGroup = forcats::fct_relevel(.f = bindingGroup, "KERS")
+  )
+
+ggplotDf <- dplyr::select(
+  plotData, geneId, bindingGroup, exptData$sampleId
+) %>% 
+  tidyr::pivot_longer(
+    cols = !c(geneId, bindingGroup),
+    names_to = "sampleId",
+    values_to = "coverage"
+  ) %>% 
+  dplyr::mutate(
+    sampleId = forcats::fct_relevel(.f = sampleId, sampleList$sampleId),
+    bindingGroup = forcats::fct_relevel(.f = bindingGroup, "KERS")
+  )
+
+
+ggpubr::compare_means(
+  formula = coverage ~ bindingGroup, data = plotDf, group.by = "sampleId",
+  method = "wilcox.test", paired = FALSE
+)
+
+ks.test(
+  x = dplyr::filter(plotDf, sampleId == "An_H3K9Ac_20h_HIST_1", bindingGroup == "KERS") %>% 
+    dplyr::pull(coverage),
+  y = dplyr::filter(plotDf, sampleId == "An_H3K9Ac_20h_HIST_1", bindingGroup == "!!RS") %>% 
+    dplyr::pull(coverage)
+)
+
+
+pt_violin <- ggplot2::ggplot(
+  data = plotDf,
+  mapping = aes(x = sampleId, y = coverage,  group = bindingGroup)
+) +
+  ggbeeswarm::geom_beeswarm(mapping = aes(color = bindingGroup), dodge.width = 1) +
+  geom_boxplot(position = position_dodge(1), width=0.3, color = "black", fill = NA) +
+  stat_compare_means(paired = FALSE, label = "p.format", size = 6) +
+  facet_grid(cols = vars(sampleId), scales = "free") +
+  labs(
+    title = "Histone acetylation vs KERS binding"
+  ) +
+  scale_color_manual(
+    name = "binding",
+    values = c("KERS" = "#E69F00", "!!RS" = "#56B4E9")
+  ) +
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.y = element_text(size = 16),
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.title = element_blank(),
+    legend.position = "bottom"
+  )
+
+
+ggsave(
+  filename = paste(outPrefix, ".violine.pdf", sep = ""),
+  plot = pt_violin, width = 10, height = 8
+)
+
+##################################################################################
+## profile heatmap
 
 tssProfiles_peak <- multi_profile_plots(
   exptInfo = tssProfileData,
@@ -279,7 +319,7 @@ tssProfiles_peak <- multi_profile_plots(
   targetName = "ATG",
   matSource = tssMatType,
   matBins = tssMatDim,
-  clusters = dplyr::select(plotData, geneId, cluster = binding),
+  clusters = dplyr::select(plotData, geneId, cluster = bindingGroup),
   drawClusterAn = TRUE,
   profileColors = colorList,
   column_title_gp = gpar(fontsize = 12),
@@ -298,24 +338,19 @@ anGl_peaks <- gene_length_heatmap_annotation(
 peaks_htlist <- NULL
 peaks_htlist <- peaks_htlist + anGl_peaks$an
 peaks_htlist <- peaks_htlist + tssProfiles_peak$heatmapList
-peaks_htlist <- peaks_htlist + regionProfiles_peak$heatmapList
+# peaks_htlist <- peaks_htlist + regionProfiles_peak$heatmapList
 
-## make sure that the order of genes in the heatmap list and in the dataframe is same
-if(all(rownames(peaks_htlist@ht_list[[ tfData$profileName[1] ]]@matrix) == plotData$geneId)){
-  
-  rowOrd_peaks <- order(plotData[[ tfCols$peakDist[[1]] ]], decreasing = TRUE)
-  
-}
+
 
 pdfWd <- 2 + 
   (length(peaks_htlist) * 2) +
   (length(polII_ids) * 0.25 * showExpressionHeatmap)
 
 # wd <- 500 + (nrow(exptData) * 700) + (length(polII_ids) * 500 * showExpressionHeatmap)
-title_peak= paste(comparisonName, ": KERS target genes (n = ", nGenes, ")", sep = "")
+title_peak= paste(comparisonName, ": Histone modification vs KERS binding groups", sep = "")
 
 
-pdf(file = paste(outPrefix, ".common_peaks.profiles.pdf", sep = ""), width = pdfWd, height = 13)
+pdf(file = paste(outPrefix, ".profiles.pdf", sep = ""), width = pdfWd, height = 13)
 
 draw(
   peaks_htlist,
@@ -326,8 +361,6 @@ draw(
   row_sub_title_side = "left",
   heatmap_legend_side = "bottom",
   gap = unit(7, "mm"),
-  # row_order = rowOrd_peaks,
-  # split = rep(1, nrow(plotData)),
   padding = unit(rep(0.5, times = 4), "cm")
 )
 
@@ -338,9 +371,3 @@ dev.off()
 
 
 ##################################################################################
-
-
-
-
-
-
