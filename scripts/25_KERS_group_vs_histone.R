@@ -16,14 +16,19 @@ rm(list = ls())
 ##################################################################################
 
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
-comparisonName <- "KERS_groups_vs_H3KAc_20h"
-outDir <- here::here("analysis", "10_KERS_histone", comparisonName)
+timePoint <- "20h"
+
+analysisName <- sprintf(fmt = "KERS_groups_vs_H3KAc_%s", timePoint)
+outDir <- here::here("analysis", "14_KERS_groups_vs_data", analysisName)
 
 file_plotSamples <- file.path(outDir, "samples.txt")
-file_kersBinding <- here::here("analysis", "03_KERS_complex", "KERS_complex_20h",
-                               "KERS_complex_20h.peaks_data.tab")
+file_kersBinding <- sprintf(
+  fmt = here::here("analysis", "03_KERS_complex", "KERS_complex_%s",
+                   "KERS_complex_%s.peaks_data.tab"),
+  timePoint, timePoint
+)
 
-outPrefix <- file.path(outDir, comparisonName)
+outPrefix <- file.path(outDir, analysisName)
 
 
 # "deeptools", "miao", "normalizedmatrix", "normalizedmatrix_5kb"
@@ -136,7 +141,7 @@ geneDesc <- AnnotationDbi::select(x = orgDb, keys = geneSet$gene, keytype = "GID
 
 geneInfo <- dplyr::left_join(x = geneSet, y = geneDesc, by = c("geneId" = "GID")) %>% 
   dplyr::left_join(y = kersGenes, by = "geneId") %>% 
-  tidyr::replace_na(replace = list(bindingGroup = "!!!!"))
+  tidyr::replace_na(replace = list(bindingGroup = "0000"))
 
 glimpse(geneInfo)
 
@@ -246,7 +251,7 @@ expressionData <- dplyr::left_join(
 
 
 plotData <- dplyr::filter(
-  expressionData, bindingGroup %in% c("KERS", "!!RS")
+  expressionData, bindingGroup %in% c("KERS", "00RS")
 ) %>% 
   dplyr::mutate(
     bindingGroup = forcats::fct_relevel(.f = bindingGroup, "KERS")
@@ -267,32 +272,36 @@ ggplotDf <- dplyr::select(
 
 
 ggpubr::compare_means(
-  formula = coverage ~ bindingGroup, data = plotDf, group.by = "sampleId",
+  formula = coverage ~ bindingGroup, data = ggplotDf, group.by = "sampleId",
   method = "wilcox.test", paired = FALSE
 )
 
 ks.test(
-  x = dplyr::filter(plotDf, sampleId == "An_H3K9Ac_20h_HIST_1", bindingGroup == "KERS") %>% 
+  x = dplyr::filter(ggplotDf, sampleId == "An_H3K9Ac_20h_HIST_1", bindingGroup == "KERS") %>% 
     dplyr::pull(coverage),
-  y = dplyr::filter(plotDf, sampleId == "An_H3K9Ac_20h_HIST_1", bindingGroup == "!!RS") %>% 
+  y = dplyr::filter(ggplotDf, sampleId == "An_H3K9Ac_20h_HIST_1", bindingGroup == "00RS") %>% 
     dplyr::pull(coverage)
 )
 
 
 pt_violin <- ggplot2::ggplot(
-  data = plotDf,
+  data = ggplotDf,
   mapping = aes(x = sampleId, y = coverage,  group = bindingGroup)
 ) +
-  ggbeeswarm::geom_beeswarm(mapping = aes(color = bindingGroup), dodge.width = 1) +
-  geom_boxplot(position = position_dodge(1), width=0.3, color = "black", fill = NA) +
+  geom_quasirandom(mapping = aes(color = bindingGroup), dodge.width = 1) +
+  geom_boxplot(
+    position = position_dodge(1), width=0.3, 
+    color = "black", fill = NA, outlier.shape = NA
+  ) +
   stat_compare_means(paired = FALSE, label = "p.format", size = 6) +
+  guides(color = guide_legend(override.aes = list(size = 5) ) ) +
   facet_grid(cols = vars(sampleId), scales = "free") +
   labs(
     title = "Histone acetylation vs KERS binding"
   ) +
   scale_color_manual(
     name = "binding",
-    values = c("KERS" = "#E69F00", "!!RS" = "#56B4E9")
+    values = c("KERS" = "#E69F00", "00RS" = "#56B4E9")
   ) +
   theme_bw() +
   theme(
@@ -300,6 +309,9 @@ pt_violin <- ggplot2::ggplot(
     axis.text.y = element_text(size = 16),
     plot.title = element_text(size = 20, face = "bold"),
     axis.title = element_blank(),
+    legend.key.size = unit(1, "cm"),
+    legend.text = element_text(size = 16),
+    legend.title = element_text(size = 16, face = "bold"),
     legend.position = "bottom"
   )
 
@@ -347,7 +359,7 @@ pdfWd <- 2 +
   (length(polII_ids) * 0.25 * showExpressionHeatmap)
 
 # wd <- 500 + (nrow(exptData) * 700) + (length(polII_ids) * 500 * showExpressionHeatmap)
-title_peak= paste(comparisonName, ": Histone modification vs KERS binding groups", sep = "")
+title_peak= paste(analysisName, ": Histone modification vs KERS binding groups", sep = "")
 
 
 pdf(file = paste(outPrefix, ".profiles.pdf", sep = ""), width = pdfWd, height = 13)
