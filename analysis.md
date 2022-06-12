@@ -27,6 +27,20 @@ cd ..
 done
 ```
 
+##Pol-II raw read count
+```bash
+for i in `cat sample_polII.list`
+do
+cd $i
+printf "##Pol-II raw read count
+bedtools multicov -bams %s_bt2.bam -bed /home/lakhanp/database/A_nidulans_FGSC_A4/annotation/A_nidulans_FGSC_A4_version_s10-m04-r03_CDS_Unique.bed > %s.CDS.readCount.tab
+error_exit \$? \n\n" $i $i >> generalJob.sh
+printf "##Pol-II raw read count for intergenic region
+bedtools multicov -bams %s_bt2.bam -bed /home/lakhanp/database/A_nidulans_FGSC_A4/annotation/intergenic_bins.bed > %s.intergenicBin.readCount.tab
+error_exit \$? \n\n" $i $i >> generalJob.sh
+cd ..
+done
+```
 
 
 ## Print control information and peak type (narrow/broad) information

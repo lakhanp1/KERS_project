@@ -12,7 +12,7 @@ source("D:/work_lakhan/github/omics_utils/04_GO_enrichment/s01_enrichment_functi
 ##################################################################################
 
 ## IMP: the first sampleID will be treated primary and clustering will be done/used for/of this sample
-analysisName <- "KERS_complex_48h"
+analysisName <- "KERS_complex_20h"
 outDir <- here::here("analysis", "03_KERS_complex", analysisName)
 outPrefix <- paste(outDir, "/", analysisName, sep = "")
 
@@ -162,6 +162,29 @@ hasPeakDf <- expressionData %>%
 dplyr::group_by_at(hasPeakDf, .vars = vars(starts_with("hasPeak."))) %>% 
   dplyr::summarise(n = n_distinct(geneId))
 
+
+tfLetters <- purrr::map(.x = exptDataList[tfIds], .f = "TF") %>% 
+  purrr::map(.f = ~ toupper(substr(x = ., start = 1, stop = 1)))
+
+# generate new column bindingGroups for KERS binding: eg. KERS, K-RS, -ER-, etc.
+bindingGroups <- dplyr::select(hasPeakDf, geneId, !!!tfCols$hasPeak) %>% 
+  dplyr::mutate(
+    across(
+      .cols = !geneId,
+      .fns = ~ if_else(
+        condition = .x == TRUE, true = tfLetters[[cur_column()]], false = "!"
+      )
+    )
+  ) %>% 
+  tidyr::unite(
+    col = "bindingGroup", !!tfIds, sep = ""
+  )
+
+
+hasPeakDf <- dplyr::left_join(
+  x = hasPeakDf, y = bindingGroups, by = "geneId"
+)
+
 readr::write_tsv(x = hasPeakDf, file = paste(outPrefix, ".peaks_data.tab", sep = ""))
 
 ## genes bound by all the KERS members
@@ -179,16 +202,20 @@ dplyr::filter_at(
   )
 
 ## group label data mean profile facet plot
-groupLabelDf <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
+groupLabelDf <- dplyr::group_by_at(
+  .tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group, bindingGroup)
+) %>%
   dplyr::summarise(n = n()) %>% 
-  dplyr::mutate(groupLabels = paste(group, ": ", n, " genes", sep = ""))
+  dplyr::mutate(groupLabels = paste(bindingGroup, ": ", n, " genes", sep = ""))
 
 groupLabels <- structure(groupLabelDf$groupLabels, names = groupLabelDf$group)
 
 
 ##################################################################################
 ## topGO enrichment
-goEnrich <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
+goEnrich <- dplyr::group_by_at(
+  .tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group, bindingGroup)
+) %>%
   do(
     topGO_enrichment(
       genes = .$geneId, orgdb = orgDb, inKeytype = "GID",
@@ -201,7 +228,9 @@ readr::write_tsv(x = goEnrich, file = paste(outPrefix, ".peakGroups.topGO.tab", 
 
 
 ## pathway enrichment
-keggEnr <- dplyr::group_by_at(.tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group)) %>%
+keggEnr <-  dplyr::group_by_at(
+  .tbl = hasPeakDf, .vars = vars(starts_with("hasPeak."), group, bindingGroup)
+) %>%
   do(
     tibble::as_tibble(
       fgsea_kegg_overrepresentation(
